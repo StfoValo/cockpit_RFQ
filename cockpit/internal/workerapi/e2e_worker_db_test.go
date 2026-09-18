@@ -29,6 +29,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -73,6 +74,13 @@ func preparaBancoE2E(t *testing.T) *bancoE2E {
 	// non si avvia. Salta, quindi NON è passata, e lo script la annota come non verificata.
 	if os.Getenv("COCKPIT_TEST_SENZA_PYTHON") != "" {
 		t.Skip("COCKPIT_TEST_SENZA_PYTHON: il worker vero non viene avviato, prova non verificata")
+	}
+	// Stessa regola, per un motivo che non dipende da chi lancia: worker_outlook importa pywintypes
+	// (pywin32), che esiste solo su Windows. Fuori di lì il worker vero non è avviabile e non c'è
+	// niente da provare — saltata NON vuol dire passata, e il registro degli esiti la annota come non
+	// verificata. Su Windows, dove pywin32 ci deve essere, un import rotto resta un fallimento.
+	if runtime.GOOS != "windows" {
+		t.Skipf("il worker vero importa pywin32 (COM), che su %s non esiste: prova non verificata", runtime.GOOS)
 	}
 	b := preparaBanco(t, 0)
 	host, err := os.Hostname()

@@ -1,3 +1,6 @@
-pywin32>=306
+# pywin32 serve solo all'adattatore COM di worker_outlook, e esiste solo su Windows. Il marcatore
+# evita che pip fallisca sull'intero file altrove: sulla VM Linux gira il worker di analisi, che
+# ha bisogno di pydantic e pymupdf e non tocca COM.
+pywin32>=306; sys_platform == "win32"
 pydantic>=2.5
 pymupdf>=1.24

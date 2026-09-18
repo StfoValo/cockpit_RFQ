@@ -1,7 +1,10 @@
 package domain
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -47,23 +50,61 @@ func TestPathDocumento(t *testing.T) {
 	}
 }
 
+// TestUNC prova il ramo Windows. Sono le stesse asserzioni di prima, con la sola differenza che
+// chiamano uncWindows invece di UNC: così girano su qualunque sistema, e il comportamento che va in
+// produzione su Windows resta dimostrato anche da una CI che gira su Linux.
 func TestUNC(t *testing.T) {
-	if got := UNC(`\\nas01\TECNICO - PREVENTIVI\PREVENTIVI DA FARE`, `ACME\WIP\x`); got != `\\nas01\TECNICO - PREVENTIVI\PREVENTIVI DA FARE\ACME\WIP\x` {
+	if got := uncWindows(`\\nas01\TECNICO - PREVENTIVI\PREVENTIVI DA FARE`, `ACME\WIP\x`); got != `\\nas01\TECNICO - PREVENTIVI\PREVENTIVI DA FARE\ACME\WIP\x` {
 		t.Errorf("UNC corto: %q", got)
 	}
-	if got := UNC(`C:\promatec\_nas_test\PREVENTIVI DA FARE\`, `\ACME\WIP\x`); got != `C:\promatec\_nas_test\PREVENTIVI DA FARE\ACME\WIP\x` {
+	if got := uncWindows(`C:\promatec\_nas_test\PREVENTIVI DA FARE\`, `\ACME\WIP\x`); got != `C:\promatec\_nas_test\PREVENTIVI DA FARE\ACME\WIP\x` {
 		t.Errorf("UNC locale: %q", got)
 	}
-	lungo := UNC(`\\nas01\radice`, strings.Repeat(`cartella lunga\`, 20)+"file.pdf")
+	lungo := uncWindows(`\\nas01\radice`, strings.Repeat(`cartella lunga\`, 20)+"file.pdf")
 	if !strings.HasPrefix(lungo, `\\?\UNC\nas01\radice\`) {
 		t.Errorf("UNC lungo di rete senza prefisso: %q", lungo)
 	}
-	lungoLocale := UNC(`C:\radice`, strings.Repeat(`cartella lunga\`, 20)+"file.pdf")
+	lungoLocale := uncWindows(`C:\radice`, strings.Repeat(`cartella lunga\`, 20)+"file.pdf")
 	if !strings.HasPrefix(lungoLocale, `\\?\C:\radice\`) {
 		t.Errorf("UNC lungo locale senza prefisso: %q", lungoLocale)
 	}
-	if strings.Count(lungo, `\\?\`) != 1 || strings.HasPrefix(UNC(lungo, "y"), `\\?\\\?\`) {
-		t.Errorf("prefisso duplicato: %q", UNC(lungo, "y"))
+	if strings.Count(lungo, `\\?\`) != 1 || strings.HasPrefix(uncWindows(lungo, "y"), `\\?\\\?\`) {
+		t.Errorf("prefisso duplicato: %q", uncWindows(lungo, "y"))
+	}
+}
+
+// TestUNCPosix prova l'altro ramo: la forma canonica con '\' diventa un percorso del sistema, e non
+// si aggiunge nessun prefisso long-path, che fuori da Windows non vuol dire niente.
+func TestUNCPosix(t *testing.T) {
+	if got := uncPosix(`/mnt/nas/PREVENTIVI DA FARE`, `ACME\WIP\x`); got != `/mnt/nas/PREVENTIVI DA FARE/ACME/WIP/x` {
+		t.Errorf("posix corto: %q", got)
+	}
+	if got := uncPosix(`/mnt/nas/PREVENTIVI/`, `\ACME\WIP\x`); got != `/mnt/nas/PREVENTIVI/ACME/WIP/x` {
+		t.Errorf("posix con separatori in eccesso: %q", got)
+	}
+	// Una radice lasciata in forma Windows non deve produrre un nome di file unico.
+	if got := uncPosix(`C:\radice`, `ACME\x`); got != `C:/radice/ACME/x` {
+		t.Errorf("posix con radice in forma Windows: %q", got)
+	}
+	lungo := uncPosix(`/mnt/nas`, strings.Repeat(`cartella lunga\`, 20)+"file.pdf")
+	if strings.Contains(lungo, `\`) || strings.Contains(lungo, `?`) {
+		t.Errorf("posix lungo: nessun backslash e nessun prefisso long-path, trovato %q", lungo)
+	}
+}
+
+// TestUNCSeguelLaPiattaforma verifica che UNC scelga il ramo giusto per il sistema su cui gira: è
+// ciò che rende utilizzabile il percorso che poi finisce in os.Stat e os.MkdirAll.
+func TestUNCSeguelLaPiattaforma(t *testing.T) {
+	got := UNC(`radice`, `ACME\x`)
+	atteso := uncPosix(`radice`, `ACME\x`)
+	if os.PathSeparator == '\\' {
+		atteso = uncWindows(`radice`, `ACME\x`)
+	}
+	if got != atteso {
+		t.Errorf("UNC = %q, atteso %q per %s", got, atteso, runtime.GOOS)
+	}
+	if filepath.Base(got) != "x" {
+		t.Errorf("il percorso non è utilizzabile dal sistema: filepath.Base(%q) = %q", got, filepath.Base(got))
 	}
 }
 

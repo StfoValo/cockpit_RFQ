@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"os"
 	"path"
 	"regexp"
 	"strings"
@@ -77,7 +78,24 @@ func NomeFileSicuro(nome string) string {
 // UNC compone radice + relativo per l'accesso reale al NAS; aggiunge il prefisso \\?\ quando il percorso
 // supera i 260 caratteri (limite MAX_PATH di Windows). Per i percorsi di rete (\\server\share) il prefisso
 // long-path è \\?\UNC\server\share.
+//
+// I percorsi RELATIVI restano nella forma canonica con '\' descritta in cima al file: è la forma
+// memorizzata in database (thread_offerta.cartella_relativa, documento.path_relativo) e non cambia.
+// UNC è il solo punto in cui quella forma diventa un percorso su cui si fa I/O vero, quindi è qui —
+// e solo qui — che ci si adatta al sistema che ospita il server: su Windows non cambia niente, altrove
+// il separatore diventa '/' e il prefisso long-path non si applica, perché fuori da Windows non c'è
+// nessun MAX_PATH da aggirare. Serve perché il server sta su una VM Linux con il NAS montato via SMB,
+// dove la radice è /mnt/... e non una stringa UNC.
 func UNC(radice, relativo string) string {
+	// os.PathSeparator è una costante: il ramo che non serve non finisce nel binario.
+	if os.PathSeparator == '\\' {
+		return uncWindows(radice, relativo)
+	}
+	return uncPosix(radice, relativo)
+}
+
+// uncWindows è il comportamento storico, invariato: è quello che gira in produzione su Windows.
+func uncWindows(radice, relativo string) string {
 	radice = strings.TrimRight(radice, `\`)
 	p := radice + `\` + strings.TrimLeft(relativo, `\`)
 	if len(p) >= 250 && !strings.HasPrefix(p, `\\?\`) {
@@ -87,4 +105,13 @@ func UNC(radice, relativo string) string {
 		return `\\?\` + p
 	}
 	return p
+}
+
+// uncPosix è lo stesso identico innesto, con il separatore del sistema al posto di '\' e senza il
+// prefisso long-path. Converte anche la radice: se qualcuno lascia una radice in forma Windows in
+// cockpit.toml mentre il server gira su Linux, ne esce un percorso sensato invece di un nome di file
+// unico pieno di backslash.
+func uncPosix(radice, relativo string) string {
+	radice = strings.TrimRight(strings.ReplaceAll(radice, `\`, `/`), `/`)
+	return radice + `/` + strings.TrimLeft(strings.ReplaceAll(relativo, `\`, `/`), `/`)
 }
