@@ -10,7 +10,7 @@
       <div><b>Data:</b> {{dataLunga .M.DataEvento}} · <b>Canale:</b> {{.M.Canale}}{{if .M.Interno}} · <span class="chip">interna</span>{{end}}</div>
       {{if .Presenze}}<div><b>{{if gt (len .Presenze) 1}}Caselle{{else}}Casella{{end}}:</b>
         {{range .Presenze}}<span class="chip casella" title="{{.CasellaIndirizzo}}">{{.CasellaNome}}{{if .Cartella.Valid}} · {{.Cartella.String}}{{end}}</span> {{end}}</div>{{end}}
-      <div><b>RFQ:</b> {{if .Thread}}<a href="/thread/{{.Thread.ThreadID}}">{{.Thread.CartellaRelativa.String}}</a> <small>({{.M.Aggancio}})</small>{{else}}<em>orfano</em>{{end}}
+      <div><b>RFQ:</b> {{if .Thread}}<a href="/thread/{{.Thread.ThreadID}}/distinta">{{.Thread.CartellaRelativa.String}}</a> <small>({{.M.Aggancio}})</small>{{else}}<em>orfano</em>{{end}}
         {{if .Richiesta}} · <b>Richiesta:</b> a {{.RichiestaFornitore}} <span class="chip richiesta {{.Richiesta.Stato}}">{{.Richiesta.Stato}}</span>{{end}}
         {{if .Riga.TriageEsito.Valid}} · <b>Proposta:</b> {{chipTriage .Riga}}
           <small>{{range motiviProposta .Riga.TriageMotivi}}· {{.}} {{end}}</small>{{end}}
@@ -33,7 +33,7 @@
       {{end}}
       <span class="separatore"></span>
       {{if .Thread}}
-      <a class="bottone" href="/thread/{{.Thread.ThreadID}}">Apri RFQ →</a>
+      <a class="bottone primario" href="/thread/{{.Thread.ThreadID}}/distinta">Apri la Distinta →</a>
       {{else if eq .Riga.ControparteTipo "fornitore"}}
       {{/* 7A: un fornitore non apre una RFQ cliente. Per costruzione, non per punteggio: il
            pulsante non c'e', e il triage non lo propone. La sua posta si aggancia a una richiesta

@@ -1335,8 +1335,9 @@ markmap:
   - **Documenti e NAS**: un blocco per pezzo con i suoi requisiti e i suoi file, «Da sistemare», gli archivi, e in fondo
     la completezza, «Conferma e copia sul NAS» e il congelamento.
   - **Fattibilita'**: che cosa si produce e che cosa si compra, con le quantita' totali.
-- La pagina della RFQ, la pagina Richieste e il Fascicolo portano alla Distinta; il Fascicolo resta per i gesti avanzati
-  (revisioni, autorizzazione degli STEP, deroghe, correzione del codice).
+- E' la pagina con cui si apre una richiesta: il titolo della card in Richieste e «Apri la Distinta» nella Inbox portano
+  qui. La pagina della RFQ di prima resta («Pagina della RFQ» in alto, «pagina della RFQ» nella card), e il Fascicolo
+  per i gesti avanzati (revisioni, autorizzazione degli STEP, deroghe, correzione del codice).
 
 ## Prove
 

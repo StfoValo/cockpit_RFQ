@@ -58,12 +58,12 @@
     {{with .FaseBreve}}<span class="rq-badge fase">{{.}}</span>{{end}}
     {{if .SLA}}<span class="rq-sla" title="{{if .GgInFase.Valid}}{{.GgInFase.Int32}} giorni in fase{{if .SlaGg.Valid}} su {{.SlaGg.Int32}} di SLA{{end}}{{end}}"><span class="semaforo {{.SLA}}"></span>{{if .GgInFase.Valid}} {{.GgInFase.Int32}} gg{{end}}</span>{{end}}
   </header>
-  <h2 class="rq-oggetto"><a href="/thread/{{.ThreadID}}" title="Apri la richiesta (ID {{.ThreadID}})">{{if .Oggetto.Valid}}{{.Oggetto.String}}{{else}}(senza oggetto){{end}}</a>{{if .RiferimentoCliente.Valid}} <span class="rq-rif">{{.RiferimentoCliente.String}}</span>{{end}}</h2>
+  <h2 class="rq-oggetto"><a href="/thread/{{.ThreadID}}/distinta" title="Apri la Distinta della richiesta (ID {{.ThreadID}})">{{if .Oggetto.Valid}}{{.Oggetto.String}}{{else}}(senza oggetto){{end}}</a>{{if .RiferimentoCliente.Valid}} <span class="rq-rif">{{.RiferimentoCliente.String}}</span>{{end}}</h2>
   <div class="rq-meta">
     <span>Buyer: <b>{{if .Buyer.Valid}}{{.Buyer.String}}{{else}}—{{end}}</b></span>
     <span>Scadenza: <b>{{if .DataScadenza}}{{.DataScadenza.Format "02/01/2006"}}{{else}}—{{end}}</b></span>
     <span>Ultimo agg.: <b>{{if .UltimoAggiornamento}}{{data .UltimoAggiornamento}}{{else}}{{data .DataInizio}}{{end}}</b></span>
-    <a href="/thread/{{.ThreadID}}/distinta" title="La distinta di questa richiesta, in quattro passi"><b>Apri la Distinta →</b></a>
+    <a href="/thread/{{.ThreadID}}" title="La pagina di prima della richiesta: la mail con gli allegati, i codici trovati">pagina della RFQ</a>
   </div>
   <div class="rq-segnali">
     {{if gt .NBloccanti 0}}<span class="rq-segnale bloc">⚠ {{.FraseBloccanti}}</span>{{end}}
