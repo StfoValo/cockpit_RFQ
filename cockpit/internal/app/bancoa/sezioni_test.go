@@ -104,11 +104,11 @@ func TestLeggiSezioniChiaviNonTradotte(t *testing.T) {
 		raw = strings.Replace(raw, "      atteso: fuori\n", "      atteso: fuori\n      colore: rosso\n", 1)
 		raw = strings.Replace(raw, "0111\"\n    atteso:\n      base: 9123456\n", "0111\"\n    atteso:\n      base: 9123456\n      chiave_inventata: 1\n", 1)
 		raw = strings.Replace(raw, "  conteggi:\n", "  formato: nuovo\n  conteggi:\n", 1)
-		raw = strings.Replace(raw, "      nell_export_0848:\n", "      nell_export_0848:\n        colonna_nuova: x\n", 1)
+		raw = strings.Replace(raw, "      nell_export_proposte:\n", "      nell_export_proposte:\n        colonna_nuova: x\n", 1)
 		return raw + "sezione_nuova: []\n"
 	})
 	atteso := []string{"baseline_decisioni[].atteso.chiave_inventata",
-		"decisioni_successive_da_rivedere.file_confermati[].nell_export_0848.colonna_nuova",
+		"decisioni_successive_da_rivedere.file_confermati[].nell_export_proposte.colonna_nuova",
 		"scenario_inoltro.file[].colore", "scenario_inoltro.formato", "sezione_nuova"}
 	if strings.Join(s.NonTradotte, "|") != strings.Join(atteso, "|") {
 		t.Fatalf("non tradotte:\n%v\nattese:\n%v", s.NonTradotte, atteso)

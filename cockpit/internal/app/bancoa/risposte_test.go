@@ -19,10 +19,9 @@ import (
 
 // L1 — il banco dopo le risposte dell'utente del 07/10 (domande-a1c.md; revisione d'impatto, R114, R116, R117):
 //   - R116 B, precisata: ogni controllo e ogni voce del gate del rapporto v3 ha una classe e un esito tri-stato; la
-//     tabella delle classi è completa e segue la revisione d'impatto (R116 §3), con le tre parti da classificare
-//     obbligatorie e la nota D-R116, e clienti_degli_export obbligatorio (D-R115 aperta); la chiusura distingue la parte
-//     obbligatoria del runner dall'incompletezza del rapporto; le uscite non cambiano (il 3 non diventa 0); il JSON del
-//     rapporto di A1a è identico, byte per byte;
+//     tabella delle classi è completa e segue la revisione d'impatto (R116 §3), con le decisioni dell'utente dell'08/10
+//     (D-R116 I, O, F; D-R115 A: B6c); la chiusura distingue la parte obbligatoria del runner dall'incompletezza del
+//     rapporto; le uscite non cambiano (il 3 non diventa 0); il JSON del rapporto di A1a è identico, byte per byte;
 //   - R117 b, ratificata e ampliata: le sentinelle sono una riga delegata ad A1c-L4D-01, non NON ESEGUITA, e l'uscita
 //     non dipende da lei;
 //   - R114, precisata: nella corsa sugli export la misura dichiara il denominatore e gli esclusi, invece di dare zero.
@@ -59,17 +58,13 @@ func nellaTabella(sede, nome string) bool {
 
 // TestRispostaR116LaTabellaDelleClassi: ogni riga ha una classe valida, la motivazione e la fonte; la prova c'è solo, e
 // sempre, per gli obbligatori esterni; nessuna voce due volte. La classificazione è quella della revisione d'impatto
-// (R116 §3), con le due regole del compito: le tre parti da classificare restano obbligatorie con la nota D-R116,
-// clienti_degli_export resta obbligatorio con la nota D-R115. Le sigle delle decisioni aperte sono quelle di
-// domande-a1c.md (R-132 della revisione delle risposte): nessuna D1, D2, D3 nei testi della tabella.
+// (R116 §3), con le decisioni dell'utente dell'08/10 (B6c): D-R116 I, O, F e D-R115 A, ognuna con la sua fonte; nessuna
+// nota «classe da decidere» resta. Le sigle sono quelle di domande-a1c.md (R-132 della revisione delle risposte):
+// nessuna D1, D2, D3 nei testi della tabella.
 func TestRispostaR116LaTabellaDelleClassi(t *testing.T) {
-	if notaDR116 != "classe da decidere dall'utente (D-R116)" || notaDR115 != "classe da decidere dall'utente (D-R115)" {
-		t.Fatalf("le note delle classi da decidere: %q, %q", notaDR116, notaDR115)
-	}
 	sedi := map[string]ClasseControllo{SedeControllo: "", SedeGate: "", SedeRapporto: ClasseInformativo, SedeFuori: ClasseFuoriPerimetro}
 	sigleVecchie := regexp.MustCompile(`\bD[1-3]\b`)
 	visti := map[[2]string]bool{}
-	daClassificare := 0
 	for _, v := range tabellaClassi {
 		if m := sigleVecchie.FindString(v.Motivazione + " " + v.Fonte + " " + v.Prova + " " + v.Nota); m != "" {
 			t.Errorf("%v: la sigla %s non è quella di domande-a1c.md", [2]string{v.Sede, v.Nome}, m)
@@ -94,19 +89,13 @@ func TestRispostaR116LaTabellaDelleClassi(t *testing.T) {
 		if !ok || (attesa != "" && v.Classe != attesa) {
 			t.Errorf("%v: sede %q con la classe %q", k, v.Sede, v.Classe)
 		}
-		if strings.Contains(v.Nota, notaDR116) {
-			daClassificare++
-			if v.Classe != ClasseObbligatorio {
-				t.Errorf("%v: una parte da classificare resta obbligatoria finché l'utente non decide (D-R116)", k)
-			}
+		if v.Nota != "" || strings.Contains(v.Fonte, "aperta") {
+			t.Errorf("%v: dopo le decisioni dell'08/10 nessuna classe resta da decidere: nota %q, fonte %q", k, v.Nota, v.Fonte)
 		}
-	}
-	if daClassificare != 3 {
-		t.Errorf("le parti da classificare con la nota D-R116 sono %d, attese 3", daClassificare)
 	}
 	for k, classe := range map[[2]string]ClasseControllo{
 		{SedeControllo, ControlloSentinelle}:             ClasseObbligatorioEsterno,
-		{SedeControllo, ControlloClientiExport}:          ClasseObbligatorio,
+		{SedeControllo, ControlloClientiExport}:          ClasseFuoriPerimetro,
 		{SedeControllo, ControlloScenario}:               ClasseObbligatorio,
 		{SedeControllo, ControlloInvariantiC5}:           ClasseObbligatorio,
 		{SedeControllo, ControlloLetture}:                ClasseObbligatorio,
@@ -124,22 +113,36 @@ func TestRispostaR116LaTabellaDelleClassi(t *testing.T) {
 		{SedeRapporto, SezioneInformativaCensimento}:     ClasseInformativo,
 		{SedeRapporto, SezioneInformativaNonApplicabili}: ClasseInformativo,
 		{SedeRapporto, SezioneInformativaChiaviLibere}:   ClasseInformativo,
+		{SedeRapporto, SezioneInformativaConfermaAlbero}: ClasseInformativo,
 		{SedeFuori, "PO-30"}:                             ClasseFuoriPerimetro,
+		{SedeFuori, ParteFinitiConGliExport}:             ClasseFuoriPerimetro,
 	} {
 		if !nellaTabella(k[0], k[1]) || classeDi(k[0], k[1]).Classe != classe {
-			t.Errorf("%v: classe %q, attesa %q (R116 §3)", k, classeDi(k[0], k[1]).Classe, classe)
+			t.Errorf("%v: classe %q, attesa %q (R116 §3, le decisioni dell'08/10)", k, classeDi(k[0], k[1]).Classe, classe)
 		}
 	}
 	if s := classeDi(SedeControllo, ControlloSentinelle); s.Prova != "A1c-L4D-01" || !strings.Contains(s.Fonte, "R117 b") {
 		t.Errorf("sentinelle: %+v (R117 b: la prova è A1c-L4D-01)", s)
 	}
-	if c := classeDi(SedeControllo, ControlloClientiExport); c.Nota != "classe da decidere dall'utente (D-R115)" {
-		t.Errorf("clienti_degli_export: %+v (D-R115 aperta)", c)
-	}
-	for _, nome := range []string{ControlloScenario, ControlloInvariantiC5, ControlloLetture} {
-		if !strings.Contains(classeDi(SedeControllo, nome).Nota, notaDR116) {
-			t.Errorf("%s: manca la nota %q", nome, notaDR116)
+	// Le decisioni dell'08/10, ognuna nella fonte della sua riga.
+	for k, fonte := range map[[2]string]string{
+		{SedeControllo, ControlloClientiExport}:          "D-R115 A, decisa dall'utente l'08/10",
+		{SedeControllo, ControlloScenario}:               "D-R116 F, decisa dall'utente l'08/10",
+		{SedeControllo, ControlloInvariantiC5}:           "D-R116 I, decisa dall'utente l'08/10",
+		{SedeControllo, ControlloLetture}:                "D-R116 O, decisa dall'utente l'08/10",
+		{SedeRapporto, SezioneInformativaConfermaAlbero}: "D-R116 I, decisa dall'utente l'08/10",
+		{SedeRapporto, SezioneInformativaCorrezioni}:     "D-R114 B, decisa dall'utente l'08/10",
+		{SedeFuori, ParteFinitiConGliExport}:             "D-R116 F, decisa dall'utente l'08/10, coerente con D-R115 A",
+	} {
+		if c := classeDi(k[0], k[1]); !strings.Contains(c.Fonte, fonte) {
+			t.Errorf("%v: fonte %q, attesa «%s»", k, c.Fonte, fonte)
 		}
+	}
+	if c := classeDi(SedeControllo, ControlloClientiExport); !strings.Contains(c.Motivazione, "non sono coerenti") || !strings.Contains(c.Motivazione, "uscita 3") {
+		t.Errorf("clienti_degli_export: la motivazione dice la non coerenza e l'uscita che resta 3: %+v", c)
+	}
+	if partiDelControllo[ParteFinitiConGliExport] != ControlloScenario {
+		t.Errorf("la parte dei finiti è del n.1: %v", partiDelControllo)
 	}
 }
 
@@ -304,7 +307,8 @@ func TestRispostaR116ChiusuraConISoliEsterni(t *testing.T) {
 	b := &banco{o: Opzioni{Gate: true}, r: RapportoBanco{Controlli: append(append([]Controllo(nil), passati...), esitoUscitaGate(g).controllo()), Gate: &g}}
 	b.chiudi()
 	ch := b.r.Chiusura
-	if ch == nil || ch.Conclusione != ConclusioneConEsterni || !ch.Obbligatori.Conclusi || ch.Obbligatori.Totale != len(passati)+4 ||
+	// clienti_degli_export è fuori perimetro (D-R115 A): non conta fra gli obbligatori del runner.
+	if ch == nil || ch.Conclusione != ConclusioneConEsterni || !ch.Obbligatori.Conclusi || ch.Obbligatori.Totale != len(passati)-1+4 ||
 		ch.Obbligatori.Passati != ch.Obbligatori.Totale || len(ch.Obbligatori.NonPassati) != 0 || ch.RapportoCompleto {
 		t.Fatalf("chiusura: %+v", ch)
 	}
@@ -316,7 +320,10 @@ func TestRispostaR116ChiusuraConISoliEsterni(t *testing.T) {
 			t.Errorf("esterno senza prova o con un esito sbagliato: %+v", e)
 		}
 	}
-	if len(ch.FuoriPerimetro) != 1 || ch.FuoriPerimetro[0].Nome != "PO-30" || ch.FuoriPerimetro[0].Motivazione == "" {
+	// Fuori perimetro: clienti_degli_export, dai controlli, e PO-30; la parte dei finiti del n.1 no, perché la corsa non ne
+	// ha (partiDelControllo).
+	if len(ch.FuoriPerimetro) != 2 || ch.FuoriPerimetro[0].Nome != ControlloClientiExport || ch.FuoriPerimetro[1].Nome != "PO-30" ||
+		ch.FuoriPerimetro[1].Motivazione == "" {
 		t.Errorf("fuori perimetro: %+v", ch.FuoriPerimetro)
 	}
 	if b.r.Gate.Esito != GateIncompleto || b.r.Esito.CodiceUscita() != UscitaNonEseguito {
@@ -332,15 +339,16 @@ func TestRispostaR116ChiusuraConISoliEsterni(t *testing.T) {
 		b.chiudi()
 		return b.r.Chiusura
 	}
-	// Un obbligatorio del runner non eseguito: non conclusa, e il controllo è fra i non passati, con la nota D-R116.
+	// Un obbligatorio del runner non eseguito: non conclusa, e il controllo è fra i non passati, con la fonte della sua
+	// classe (D-R116 O per le letture parziali, che restano obbligatorie).
 	cc := append([]Controllo(nil), passati...)
 	for i := range cc {
-		if cc[i].Nome == ControlloInvariantiC5 {
+		if cc[i].Nome == ControlloLetture {
 			cc[i].Stato, cc[i].Motivo = ControlloNonEseguito, "2 parti non verificabili"
 		}
 	}
 	if ch := chiudiCon(cc, &g); ch.Conclusione != ConclusioneNonConclusa || len(ch.Obbligatori.NonPassati) != 1 ||
-		!strings.Contains(ch.Obbligatori.NonPassati[0].Nota, notaDR116) {
+		!strings.Contains(ch.Obbligatori.NonPassati[0].Fonte, "D-R116 O") {
 		t.Errorf("un obbligatorio non eseguito: %+v", ch)
 	}
 	// Una voce obbligatoria del gate non superata: non conclusa.

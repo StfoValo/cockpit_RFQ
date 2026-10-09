@@ -207,7 +207,8 @@ func TestA1cL131LaCopiaPortaTuttiICampi(t *testing.T) {
 
 // TestA1cL131IlMarcatoreArrivaAllaMisura (R114, il gemello CodiceLettoMarcatore; T-B6-50): il marcatore della lettura
 // del vecchio motore passa da valutazione a confronto, e la misura lo vede. Con la stessa base, la lettura «A» contro
-// il deciso «B» è una PrimaMarcatore, non una Prima (i due conteggi restano separati: D-R114 aperta); la lettura «A»
+// il deciso «B» è una PrimaMarcatore, non una Prima (D-R114 B: il titolo del rapporto li somma, i due conteggi restano
+// separati); la lettura «A»
 // contro il deciso senza marcatore è un marcatore da un lato solo. Se la copia perde il campo, il primo caso diventa
 // «da un lato solo» e il secondo sparisce.
 func TestA1cL131IlMarcatoreArrivaAllaMisura(t *testing.T) {

@@ -123,8 +123,9 @@ func TestCorrezioniPerCliente(t *testing.T) {
 }
 
 // TestIlTestoDellaMisura (R114, precisata dall'utente il 07/10): il riepilogo presenta la misura come «indicatore
-// ricostruito delle correzioni necessarie», con il denominatore, la copertura e gli esclusi per motivo; prima e
-// prima_marcatore separati e dichiarati non sommati (D-R114); dopo con le tre parti; nessuna misura di tempo.
+// ricostruito delle correzioni necessarie», con il denominatore, la copertura e gli esclusi per motivo; il titolo «prima»
+// è base più marcatore, con le due parti accanto e il marcatore da un solo lato a parte (D-R114 B, decisa dall'utente
+// l'08/10); dopo con le tre parti; nessuna misura di tempo.
 func TestIlTestoDellaMisura(t *testing.T) {
 	x := confronto.CorrezioniManuali{Decisi: 9, Valutabili: 4, Esclusi: confronto.EsclusiCorrezioni{SoloOrigineManuale: 1, SenzaLetturaVecchia: 2,
 		CodiceNonLeggibile: 1, NuovoNonValutato: 1}, Prima: 1, PrimaMarcatore: 1, MarcatoreSoloDaUnLato: 1, Dopo: 3, FalseAssociazioni: 1,
@@ -133,7 +134,7 @@ func TestIlTestoDellaMisura(t *testing.T) {
 	for _, parte := range []string{
 		"(indicatore ricostruito delle correzioni necessarie)", "decisi 9, denominatore 4 valutabili (copertura 4 su 9)",
 		"esclusi per motivo: solo_origine_manuale 1, senza_lettura_vecchia 2, codice_non_leggibile 1, documento_senza_componente 0, nuovo_non_valutato 1",
-		"prima 1 (cambi di base), prima_marcatore 1 (non sommato a prima: D-R114 aperta), marcatore solo da un lato 1",
+		"prima 2 (base e marcatore, D-R114 B: cambi di base 1, marcatori diversi 1), a parte marcatore solo da un lato 1",
 		"dopo 3 (false associazioni 1, ambiguità 1, astensioni 1)", "fuori dalla misura: stessa base su un altro target 2",
 	} {
 		if !strings.Contains(s, parte) {

@@ -80,7 +80,9 @@ func conPrefisso(xs []string, prefisso string) bool {
 
 // TestR101LettureSullaScena: una revisione e un marcatore in più nella baseline, la base sbagliata nei reali. Prima
 // erano lette e buttate, e la corsa era conforme. Sulla scena l'interpretazione dei file è parziale (gli export ACME non
-// hanno fatti): ogni chiave è dichiarata non verificata, una per una, e la corsa non è conforme.
+// hanno fatti): ogni chiave senza ambito è dichiarata non verificata, una per una, e la corsa non è conforme. La base dei
+// reali invece è quella del nome dell'archivio (D-R116 O, B6c): il nome si legge per intero, e la base sbagliata è una
+// differenza.
 func TestR101LettureSullaScena(t *testing.T) {
 	r := corsaBanco(t, attesiMutati(func(a string) string {
 		a = sostituisci(t, a, "0111\"\n    atteso:\n      base: 9123456\n", "0111\"\n    atteso:\n      base: 9123456\n      revisione: \"Z9\"\n      marcatore: \"Q\"\n")
@@ -88,10 +90,13 @@ func TestR101LettureSullaScena(t *testing.T) {
 	}), true, false)
 	d := dettaglio(r, ControlloLetture)
 	for _, k := range []string{"baseline_decisioni[0].atteso.marcatore: interpretazione parziale",
-		"baseline_decisioni[0].atteso.revisione: interpretazione parziale", "reali_archivi[0].atteso.base: interpretazione parziale"} {
+		"baseline_decisioni[0].atteso.revisione: interpretazione parziale"} {
 		if !conPrefisso(d.NonVerificate, k) {
 			t.Errorf("la chiave non è dichiarata: %q in %q", k, d.NonVerificate)
 		}
+	}
+	if !conPrefisso(d.Differenze, "reali_archivi[0].atteso.base: atteso 9999999, ottenuto 9123460") || conPrefisso(d.NonVerificate, "reali_archivi[0].atteso.base") {
+		t.Errorf("la base dei reali si giudica sul nome: differenze %q, non verificate %q", d.Differenze, d.NonVerificate)
 	}
 	if conPrefisso(d.NonVerificate, "baseline_decisioni[0].atteso.base") {
 		t.Errorf("la base della baseline è il controllo (2), non un'altra lettura: %q", d.NonVerificate)
@@ -516,12 +521,15 @@ func TestR105PredicatoSenzaComponenti(t *testing.T) {
 			t.Errorf("%s: differenza %q, non fatto %q", c.nome, d, nf)
 		}
 	}
-	// Nella corsa sugli export: prodotti_confermati_db vero, e lo scenario senza target confermati: non verificabile.
+	// Nella corsa sugli export: prodotti_confermati_db vero, e lo scenario senza target confermati: il predicato non si
+	// decide, e la parte è fuori perimetro (D-R116 F, B6c): non una differenza, e non una parte che rende il n.1 NON
+	// ESEGUITO.
 	r := corsaBanco(t, attesiMutati(func(a string) string {
 		return sostituisci(t, a, "  prodotti_confermati_db: false\n", "  prodotti_confermati_db: true\n")
 	}), true, false)
-	if c, _ := controlloBanco(r, ControlloScenario); c.Stato != ControlloNonEseguito || c.Differenze != 0 {
-		t.Errorf("n.1 con gli export: %+v", c)
+	if c, _ := controlloBanco(r, ControlloScenario); c.Stato != ControlloEseguito || c.Differenze != 0 ||
+		!conPrefisso(dettaglio(r, ControlloScenario).FuoriPerimetro, "scenario_inoltro.prodotti_confermati_db: i componenti non sono nella fotografia") {
+		t.Errorf("n.1 con gli export: %+v, %+v", c, dettaglio(r, ControlloScenario))
 	}
 }
 
@@ -937,9 +945,10 @@ func TestBadgeDellaC5(t *testing.T) {
 }
 
 // TestC5LaRigaDellAltraModalita: la C5 confronta con -dsn la decisione, con -exports la riga dell'export; la riga
-// dell'altra modalità non si applica a questa corsa (R-117: un elenco informativo, non le parti non verificate), mentre
-// le righe della conferma dell'albero restano non verificate. La fotografia della scena serve per tutte e due: qui conta
-// che cosa il controllo confronta e che cosa dichiara.
+// dell'altra modalità non si applica a questa corsa (R-117: un elenco informativo, non le parti non verificate). Le righe
+// della conferma dell'albero non sono più fra le parti non verificate: stanno nella sezione informativa del rapporto
+// (D-R116 I, B6c). La fotografia della scena serve per tutte e due: qui conta che cosa il controllo confronta e che cosa
+// dichiara.
 func TestC5LaRigaDellAltraModalita(t *testing.T) {
 	s, ix := fotoEIndice(t)
 	f := fotoDellaScena(t, s)
@@ -948,12 +957,12 @@ func TestC5LaRigaDellAltraModalita(t *testing.T) {
 	tr := traduci(sez, f, ix, &ins)
 	badge := map[uuid.UUID]confronto.Badge{allDaRivedere: confronto.BadgeUguale}
 	dsn := controlloInvariantiC5(&sez, tr, f, ix, contestoCorsa{}, badge)
-	if len(dsn.differenze) != 0 || len(dsn.nonFatti) != 2 || len(dsn.nonApplicabili) != 1 ||
-		!conPrefisso(dsn.nonApplicabili, "decisioni_successive_da_rivedere.file_confermati[0].nell_export_0848: si verifica con -exports") {
+	if len(dsn.differenze) != 0 || len(dsn.nonFatti) != 0 || len(dsn.nonApplicabili) != 1 ||
+		!conPrefisso(dsn.nonApplicabili, "decisioni_successive_da_rivedere.file_confermati[0].nell_export_proposte: si verifica con -exports") {
 		t.Errorf("con -dsn: differenze %q, non fatti %q, non applicabili %q", dsn.differenze, dsn.nonFatti, dsn.nonApplicabili)
 	}
 	exp := controlloInvariantiC5(&sez, tr, f, ix, contestoCorsa{export: true}, badge)
-	if len(exp.differenze) != 0 || len(exp.nonFatti) != 2 || len(exp.nonApplicabili) != 2 ||
+	if len(exp.differenze) != 0 || len(exp.nonFatti) != 0 || len(exp.nonApplicabili) != 2 ||
 		!conPrefisso(exp.nonApplicabili, "decisioni_successive_da_rivedere.file_confermati[0].decisione_proposta: si verifica con -dsn") {
 		t.Errorf("con gli export: differenze %q, non fatti %q, non applicabili %q", exp.differenze, exp.nonFatti, exp.nonApplicabili)
 	}

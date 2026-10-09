@@ -191,20 +191,15 @@ func TestControlloFontiCasiEAttesi(t *testing.T) {
 
 // nonVerificateACME: le parti che la scena ACME sugli export non può verificare, controllo per controllo (la regola
 // delle chiavi accettate: dichiarate, mai buttate). Sono limiti della modalità, non differenze:
-//   - n.1: prodotti_confermati_db, perché negli export i componenti mancano e i finiti non si vedono (R-105);
-//   - C5: le righe della conferma dell'albero, di cui il runner risolve solo gli ID (R-109); la decisione del dump non
-//     si applica agli export (R-117: sta fra le parti non applicabili, nonApplicabiliACME);
-//   - letture e invarianti: la base dell'archivio dei reali (senza ambito, e l'interpretazione dell'archivio è
-//     parziale; revisione_dal_nome invece si giudica sul nome, R-116) e target_presente (i componenti mancano).
-//     scritture_consentite sta nella voce del gate «zero scritture» (R-118).
+//   - letture e invarianti: target_presente (i componenti mancano). La base dell'archivio dei reali è quella del nome,
+//     che si legge per intero anche con l'interpretazione parziale, e si giudica (D-R116 O, B6c), come
+//     revisione_dal_nome (R-116). scritture_consentite sta nella voce del gate «zero scritture» (R-118).
+//
+// Dopo le decisioni dell'08/10 (B6c) non sono più qui: il n.1 senza i finiti, fuori perimetro con gli export (D-R116 F:
+// fra le parti fuori perimetro dei dettagli); le righe della conferma dell'albero, nella sezione informativa del rapporto
+// (D-R116 I). La decisione del dump della C5 non si applica agli export (R-117: nonApplicabiliACME).
 var nonVerificateACME = map[string][]string{
-	ControlloScenario: {"scenario_inoltro.prodotti_confermati_db: i componenti non sono nella fotografia"},
-	ControlloInvariantiC5: {
-		"decisioni_successive_da_rivedere.conferma_albero.allegati[0]: riga della conferma dell'albero",
-		"decisioni_successive_da_rivedere.conferma_albero.documenti[0]: riga della conferma dell'albero",
-	},
 	ControlloLetture: {
-		"reali_archivi[0].atteso.base: interpretazione parziale",
 		"reali_archivi[0].target_presente: i componenti non sono nella fotografia",
 	},
 }

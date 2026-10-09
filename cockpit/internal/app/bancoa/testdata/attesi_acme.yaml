@@ -263,7 +263,7 @@ decisioni_successive_da_rivedere:
         componente_id: 00000000-0000-4000-8000-000000000032
       decisione_documento:
         documento_id: 00000000-0000-4000-8000-000000000222
-      nell_export_0848:
+      nell_export_proposte:
         stato: confermata
         codice: 9123459A
       sovrascritta_dal_motore: false

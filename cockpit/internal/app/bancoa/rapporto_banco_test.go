@@ -70,7 +70,9 @@ func TestRapportoBancoScrittoESenzaTestiDiMail(t *testing.T) {
 		t.Fatalf("il JSON del rapporto non è canonico: %v", err)
 	}
 	txt, _ := os.ReadFile(filepath.Join(s.uscita, "rapporto-exports.txt"))
-	if !strings.HasPrefix(string(txt), "ESITO: NON ESEGUITO — runner_1_scenario_e_casi: 1 parti non verificabili;") ||
+	// Il primo controllo non eseguito della scena è quello delle letture (target_presente senza i componenti): il n.1
+	// senza i finiti è fuori perimetro con gli export (D-R116 F), e non lo rende più NON ESEGUITO.
+	if !strings.HasPrefix(string(txt), "ESITO: NON ESEGUITO — letture_e_invarianti_dei_file: 1 parti non verificabili") ||
 		!strings.Contains(string(txt), "\nmodalità: exports\n") || string(txt) != r.Testo() {
 		t.Fatalf("il riepilogo scritto:\n%s", txt)
 	}
