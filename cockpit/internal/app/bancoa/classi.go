@@ -15,12 +15,18 @@ import (
 // sentinelle, delegata ad A1c-L4D-01 (R117 b, ratificata dall'utente il 07/10): un'esclusione specifica e motivata,
 // non una conversione generica.
 //
-// La classificazione è quella della revisione d'impatto delle risposte (R116 §3), con due regole: le tre parti «da
-// classificare» (le righe della «Conferma l'albero», le letture dei file parziali fuori dal nome, il n.1 senza i finiti
-// con gli export) restano obbligatorie, con la nota «classe da decidere dall'utente (D-R116)»; clienti_degli_export
-// resta obbligatorio, con la nota «classe da decidere dall'utente (D-R115)». Le sigle sono quelle delle decisioni aperte
-// in domande-a1c.md. Una voce che la tabella non conosce è obbligatoria per difetto: la risposta non autorizza
-// un'esenzione generica.
+// La classificazione è quella della revisione d'impatto delle risposte (R116 §3), con le decisioni dell'utente
+// dell'08/10 sulle tre parti che erano «da classificare» e sui clienti degli export, ognuna un'esclusione specifica e
+// motivata, ratificata, come le sentinelle:
+//   - D-R116 I: le righe legacy della «Conferma l'albero» sono informative, in una sezione del rapporto loro
+//     (righe_conferma_albero); gli invarianti della C5 restano obbligatori per i file confermati;
+//   - D-R116 O: le letture dei file con l'interpretazione parziale restano obbligatorie: si giudicano i valori
+//     disponibili, e il resto si dichiara parziale;
+//   - D-R116 F: con gli export, il n.1 senza i finiti è fuori perimetro, con una riga sua (coerente con D-R115 A);
+//   - D-R115 A: clienti_degli_export è fuori perimetro, con la non coerenza degli identificativi nel motivo; lo stato
+//     resta NON ESEGUITO e l'uscita 3.
+//
+// Una voce che la tabella non conosce è obbligatoria per difetto: nessuna esenzione generica.
 
 // ClasseControllo: la classe di un controllo o di una voce del gate (R116 B).
 type ClasseControllo string
@@ -69,22 +75,21 @@ const (
 	SezioneInformativaCensimento     = "censimento"
 	SezioneInformativaNonApplicabili = "non_applicabili"
 	SezioneInformativaChiaviLibere   = "chiavi_libere"
+	// SezioneInformativaConfermaAlbero: le righe della «Conferma l'albero» della C5 (D-R116 I).
+	SezioneInformativaConfermaAlbero = "righe_conferma_albero"
 )
+
+// ParteFinitiConGliExport: la riga fuori perimetro della parte del n.1 che con gli export non si decide, senza i finiti
+// (D-R116 F).
+const ParteFinitiConGliExport = "runner_1_finiti_con_gli_export"
 
 // nomeControlloGate: il controllo del gate con -gate (esitoUscitaGate). Nella chiusura il gate si conta voce per voce,
 // ognuna con la sua classe: il controllo che le riassume non entra una seconda volta.
 const nomeControlloGate = "gate"
 
-// notaDR116, notaDR115: le note delle classi che l'utente deve ancora decidere, con le sigle delle decisioni aperte in
-// domande-a1c.md: D-R116 per le tre parti «da classificare», D-R115 per i clienti degli export.
-const (
-	notaDR116 = "classe da decidere dall'utente (D-R116)"
-	notaDR115 = "classe da decidere dall'utente (D-R115)"
-)
-
 // voceClassificata: una riga della tabella statica delle classi: la sede e il nome, la classe, la motivazione, la
 // fonte (contratto, decisione, prova); per un obbligatorio esterno la prova che lo chiude; la nota di una classe che
-// l'utente deve ancora decidere.
+// l'utente deve ancora decidere (dopo le decisioni dell'08/10 nessuna).
 type voceClassificata struct {
 	Sede        string
 	Nome        string
@@ -94,6 +99,11 @@ type voceClassificata struct {
 	Prova       string
 	Nota        string
 }
+
+// partiDelControllo: le righe fuori perimetro che sono una parte di un controllo (D-R116 F), con il nome del controllo.
+// La chiusura le elenca solo se nella corsa quel controllo ha parti fuori perimetro; le altre righe fuori perimetro
+// (PO-30) valgono sempre.
+var partiDelControllo = map[string]string{ParteFinitiConGliExport: ControlloScenario}
 
 // tabellaClassi: la classe di ogni voce, una volta sola, nell'ordine del rapporto. È la fonte unica: il rapporto e la
 // chiusura la leggono da qui, e il README la riassume.
@@ -116,13 +126,12 @@ var tabellaClassi = []voceClassificata{
 	// Il percorso puro e i controlli del runner.
 	{SedeControllo, "valutazione", ClasseObbligatorio, "valutazione.Calcola senza errori di contratto, con l'impronta", "6.4.9, passo 6; F0-14", "", ""},
 	{SedeControllo, ControlloCasiFoto, ClasseObbligatorio, "il file dei casi contro la fotografia", "R-103; T-B6-74, T-B6-112", "", ""},
-	{SedeControllo, ControlloClientiExport, ClasseObbligatorio,
-		"con gli export, i clienti dei thread con la ragione sociale: senza, il thread non si valuta",
-		"T-B6-104; R115 A, ratificata dall'utente il 07/10 con un vincolo (domande-a1c.md); D-R115 aperta", "",
-		notaDR115},
-	{SedeControllo, ControlloScenario, ClasseObbligatorio, "il caso dello scenario coincide con gli attesi; il predicato dei target confermati",
-		"6.4.9, n.1; T-B0-15; R29 a; R48 A; R70 A; D-R116 aperta", "",
-		"contiene una parte da classificare: con gli export, il n.1 senza i finiti (la sezione dei componenti è assente); " + notaDR116},
+	{SedeControllo, ControlloClientiExport, ClasseFuoriPerimetro,
+		"con gli export del campione del 02/10 i clienti dei thread non sono nell'export dei clienti, che è di prima della ricreazione del DB del 01/10, con UUID diversi da quelli degli altri export e del dump: gli identificativi non sono coerenti, e quei thread non si valutano. È un limite accettato del campione, non un difetto del motore A né delle migrazioni: il motivo della corsa registra la non coerenza, con il numero dei thread; lo stato resta NON ESEGUITO e l'uscita 3; gli export non si toccano, nessun collegamento fra UUID si crea, gli attesi non cambiano",
+		"D-R115 A, decisa dall'utente l'08/10; T-B6-104; R115 A, ratificata dall'utente il 07/10 con un vincolo (domande-a1c.md)", "", ""},
+	{SedeControllo, ControlloScenario, ClasseObbligatorio,
+		"il caso dello scenario coincide con gli attesi; il predicato dei target confermati. Con gli export la parte senza i finiti è fuori perimetro, con la sua riga",
+		"6.4.9, n.1; T-B0-15; R29 a; R48 A; R70 A; D-R116 F, decisa dall'utente l'08/10", "", ""},
 	{SedeControllo, ControlloRisoluzione, ClasseObbligatorio, "ogni ID e ogni sha256 degli attesi si risolve nella fotografia", "6.4.9, n.2; D7", "", ""},
 	{SedeControllo, ControlloFonti, ClasseObbligatorio, "con gli export, gli export del manifest e le fonti degli attesi coincidono", "6.4.9, n.3", "", ""},
 	{SedeControllo, ControlloCasiIndice, ClasseObbligatorio, "il file dei casi è quello che l'indice dichiara per l'anteprima", "6.4.9, n.4; R29 b C", "", ""},
@@ -130,12 +139,12 @@ var tabellaClassi = []voceClassificata{
 	{SedeControllo, ControlloTraduzione, ClasseObbligatorio, "le sezioni degli attesi si traducono senza contraddizioni", "6.4.6; 6.4.9; D8, R-51", "", ""},
 	{SedeControllo, "confronto", ClasseObbligatorio, "le impronte dei confronti calcolate", "6.4.9; R-48", "", ""},
 	{SedeControllo, ControlloBaselineRighe, ClasseObbligatorio, "le righe e le basi della baseline, i controlli (1) e (2)", "6.4.9; R-102", "", ""},
-	{SedeControllo, ControlloInvariantiC5, ClasseObbligatorio, "gli invarianti dei file della C5",
-		"6.4.9, la C5 nel runner; R-109; R-117; D-R116 aperta", "",
-		"contiene una parte da classificare: le righe della «Conferma l'albero», di cui il runner risolve solo gli ID; " + notaDR116},
-	{SedeControllo, ControlloLetture, ClasseObbligatorio, "le letture attese e le chiavi booleane dei file della baseline e dei reali",
-		"R-101; R-116; A1b-22; D-R116 aperta", "",
-		"contiene una parte da classificare: le letture dei file con l'interpretazione parziale, fuori dal nome; " + notaDR116},
+	{SedeControllo, ControlloInvariantiC5, ClasseObbligatorio,
+		"gli invarianti dei file della C5; le righe della «Conferma l'albero» stanno nella sezione informativa righe_conferma_albero, un'esclusione specifica e motivata, ratificata",
+		"6.4.9, la C5 nel runner; R-109; R-117; D-R116 I, decisa dall'utente l'08/10", "", ""},
+	{SedeControllo, ControlloLetture, ClasseObbligatorio,
+		"le letture attese e le chiavi booleane dei file della baseline, dei reali e della C5; con l'interpretazione parziale si giudicano i valori disponibili (le chiavi del nome, e la base dei reali, che il piano legge dal nome) e il resto resta dichiarato non verificato",
+		"R-101; R-116; A1b-22; D-R116 O, decisa dall'utente l'08/10", "", ""},
 	{SedeControllo, "casi_contratto", ClasseObbligatorio, "i casi di contratto degli attesi sul motore del prodotto", "6.4.9; R52 A", "", ""},
 	{SedeControllo, nomeControlloGate, ClasseObbligatorio, "il gate con -gate, che decide l'uscita; nella chiusura si conta voce per voce", "6.4.9, il gate nel rapporto; R44; R58 B", "", ""},
 	// Le voci del gate.
@@ -155,16 +164,24 @@ var tabellaClassi = []voceClassificata{
 		"gli assi, lo stato e il fascicolo sui dati veri sono informazione, mai voci del gate; la fonte attesa dei prodotti attesi dello scenario (PO-29), derivata dagli attesi con una regola dichiarata, accanto a quella calcolata",
 		"T-B0-16; R69 A; PO-29; R109, precisata dall'utente il 07/10, senza lettera (domande-a1c.md); E2 §2.3", "", ""},
 	{SedeRapporto, SezioneInformativaCorrezioni, ClasseInformativo,
-		"un indicatore ricostruito delle correzioni necessarie, non il tempo risparmiato; dichiara denominatore, copertura ed esclusi",
-		"R30 f A; R114, precisata dall'utente il 07/10 (domande-a1c.md); D-R114 aperta", "", ""},
+		"un indicatore ricostruito delle correzioni necessarie, non il tempo risparmiato; dichiara denominatore, copertura ed esclusi; il titolo «prima» è base più marcatore, con il marcatore da un solo lato a parte",
+		"R30 f A; R114, precisata dall'utente il 07/10 (domande-a1c.md); D-R114 B, decisa dall'utente l'08/10", "", ""},
 	{SedeRapporto, SezioneInformativaProfilo, ClasseInformativo, "i massimi osservati contro i limiti dell'indice e i tetti del codice", "R43 B; C-23", "", ""},
 	{SedeRapporto, SezioneInformativaCensimento, ClasseInformativo, "i messaggi fuori RFQ dei casi di censimento, forma per forma", "R34 c", "", ""},
 	{SedeRapporto, SezioneInformativaNonApplicabili, ClasseInformativo, "le parti che il piano assegna all'altra modalità", "R-117", "", ""},
-	{SedeRapporto, SezioneInformativaChiaviLibere, ClasseInformativo, "le chiavi delle sezioni a forma libera che non sono ID", "R-109", "", ""},
+	{SedeRapporto, SezioneInformativaChiaviLibere, ClasseInformativo,
+		"le chiavi delle sezioni a forma libera che non sono ID, e le chiavi descrittive delle sezioni e delle voci, che il piano non fa confrontare: si riportano, non si verificano",
+		"R-109; T-B6c-04, T-B6c-06, T-B6c-08", "", ""},
+	{SedeRapporto, SezioneInformativaConfermaAlbero, ClasseInformativo,
+		"le righe legacy della «Conferma l'albero» della C5 non sono un'uscita del motore A, e gli attesi le portano come contesto: il runner ne risolve gli ID (n.2) e non verifica che siano invariate. Escono dalla parte obbligatoria degli invarianti della C5, con il conteggio e il motivo: un'esclusione specifica e motivata, ratificata, come le sentinelle",
+		"D-R116 I, decisa dall'utente l'08/10; R-109", "", ""},
 	// Fuori dal perimetro approvato.
 	{SedeFuori, "PO-30", ClasseFuoriPerimetro,
 		"la copia preparata con i gesti dell'operatore non è una corsa del runner: con i target confermati il n.1 fallirebbe per costruzione; PO-29 resta sul dump intatto",
 		"E1 §11 («mai nel gate»); R110, precisata e ampliata dall'utente il 07/10 (domande-a1c.md)", "", ""},
+	{SedeFuori, ParteFinitiConGliExport, ClasseFuoriPerimetro,
+		"con gli export la sezione dei componenti è assente: senza i finiti il predicato dei target confermati del n.1 (R70 A) non si decide. Il campione di export è incompleto e non si completa (D-R115 A); con -dsn i componenti ci sono e la parte si verifica",
+		"D-R116 F, decisa dall'utente l'08/10, coerente con D-R115 A", "", ""},
 }
 
 // classeDi: la riga della tabella per una voce. Una voce che la tabella non conosce è obbligatoria per difetto, con il
@@ -238,13 +255,16 @@ const (
 // Chiusura: il riepilogo della chiusura della corsa (R116 B, precisata dall'utente il 07/10). Non decide l'uscita, che
 // resta quella dei controlli e, con -gate, del gate: il 3 resta 3.
 //   - Conclusione: una delle quattro frasi qui sopra; RapportoCompleto: la parte obbligatoria conclusa, nessun
-//     obbligatorio esterno da chiudere, nessun informativo incompleto, e il gate nel rapporto.
+//     obbligatorio esterno da chiudere, nessun informativo incompleto, il gate nel rapporto e nessun controllo NON
+//     ESEGUITO, di nessuna classe (B6c: un controllo fuori perimetro e non eseguito, come clienti_degli_export con
+//     D-R115 A, non conta fra gli obbligatori, ma il rapporto con l'uscita 3 non è mai completo).
 //   - Gate: l'esito del gate, o «assente» senza -attesi.
 //   - Obbligatori: gli obbligatori del runner (i controlli e le voci del gate), conclusi o no; quelli non passati uno per
-//     uno, con le note delle classi da decidere.
+//     uno, con la fonte della loro classe.
 //   - Esterni: gli obbligatori esterni, ognuno con la sua prova e il suo esito.
 //   - Informativi: gli informativi incompleti, con il motivo.
-//   - FuoriPerimetro: le voci esterne al perimetro approvato, con la motivazione.
+//   - FuoriPerimetro: le voci esterne al perimetro approvato, con la motivazione e, per i controlli, l'esito della corsa
+//     (un fuori perimetro non eseguito resta «non eseguito»).
 type Chiusura struct {
 	Conclusione      string               `json:"conclusione"`
 	RapportoCompleto bool                 `json:"rapporto_completo"`
@@ -325,9 +345,20 @@ func chiusuraDi(r RapportoBanco) *Chiusura {
 	for _, s := range informativiIncompleti(r) {
 		ch.Informativi = append(ch.Informativi, voceDiChiusura(classeDi(SedeRapporto, s[0]), "", s[1]))
 	}
+	fuori := map[string]int{}
+	for _, d := range r.Dettagli {
+		fuori[d.Nome] += len(d.FuoriPerimetro)
+	}
 	for _, t := range tabellaClassi {
-		if t.Sede == SedeFuori {
+		if t.Sede != SedeFuori {
+			continue
+		}
+		c, parte := partiDelControllo[t.Nome]
+		switch {
+		case !parte:
 			conta(t, "", "")
+		case fuori[c] > 0:
+			conta(t, "", fmt.Sprintf("%d parti di %s fuori perimetro in questa corsa", fuori[c], c))
 		}
 	}
 	ch.Obbligatori.Conclusi = ch.Obbligatori.Totale > 0 && ch.Obbligatori.Passati == ch.Obbligatori.Totale
@@ -348,9 +379,23 @@ func chiusuraDi(r RapportoBanco) *Chiusura {
 		ch.Conclusione = ConclusioneConclusa
 	}
 	// Senza il gate (senza -attesi) il rapporto non è mai completo: le voci del gate e i controlli del runner 1–5 non ci
-	// sono, anche se gli obbligatori di questa corsa sono passati (T-B6-194).
-	ch.RapportoCompleto = ch.Conclusione == ConclusioneConclusa && len(ch.Informativi) == 0 && r.Gate != nil
+	// sono, anche se gli obbligatori di questa corsa sono passati (T-B6-194). Con un controllo NON ESEGUITO, di
+	// qualunque classe, nemmeno (conNonEseguiti).
+	ch.RapportoCompleto = ch.Conclusione == ConclusioneConclusa && len(ch.Informativi) == 0 && r.Gate != nil &&
+		!conNonEseguiti(r.Controlli)
 	return ch
+}
+
+// conNonEseguiti: un controllo del rapporto è NON ESEGUITO, di qualunque classe. Con D-R115 A un controllo fuori
+// perimetro resta non eseguito: esce dagli obbligatori del runner, ma il rapporto con l'uscita 3 non diventa completo
+// (T-B6c-11: il 3 non diventa un successo, nemmeno nella chiusura).
+func conNonEseguiti(cc []Controllo) bool {
+	for _, c := range cc {
+		if c.Stato == ControlloNonEseguito {
+			return true
+		}
+	}
+	return false
 }
 
 // informativiIncompleti: le sezioni informative del rapporto che la corsa non ha completato, con il motivo, in ordine
@@ -361,7 +406,8 @@ func chiusuraDi(r RapportoBanco) *Chiusura {
 //   - correzioni_manuali: assenti, o con decisi esclusi dal denominatore (la copertura non è piena) o thread non
 //     valutati a parte;
 //   - profilo_limiti, censimento: solo se assenti;
-//   - non_applicabili e chiavi_libere: se ce ne sono.
+//   - non_applicabili e chiavi_libere: se ce ne sono;
+//   - righe_conferma_albero: se ce ne sono, perché non sono verificate (D-R116 I).
 func informativiIncompleti(r RapportoBanco) [][2]string {
 	var out [][2]string
 	letta := r.Fotografia != nil
@@ -418,6 +464,10 @@ func informativiIncompleti(r RapportoBanco) [][2]string {
 	if a := r.Attesi; a != nil && len(a.ChiaviLibere) > 0 {
 		out = append(out, [2]string{SezioneInformativaChiaviLibere, fmt.Sprintf("%d chiavi libere non verificate", len(a.ChiaviLibere))})
 	}
+	if a := r.RigheConfermaAlbero; a != nil && a.Righe > 0 {
+		out = append(out, [2]string{SezioneInformativaConfermaAlbero,
+			fmt.Sprintf("%d righe della «Conferma l'albero» non verificate: il runner ne risolve gli ID (n.2); informative (D-R116 I)", a.Righe)})
+	}
 	return out
 }
 
@@ -456,7 +506,14 @@ func testoChiusura(riga func(string, ...any), ch *Chiusura) {
 		voce("informativo incompleto", v)
 	}
 	for _, v := range ch.FuoriPerimetro {
-		s := "  fuori perimetro: " + v.Nome + " — " + v.Motivazione + " (" + v.Fonte + ")"
+		s := "  fuori perimetro: " + v.Nome
+		if v.Esito != "" {
+			s += " (" + string(v.Esito) + ")"
+		}
+		s += " — " + v.Motivazione + " (" + v.Fonte + ")"
+		if v.Motivo != "" {
+			s += "; in questa corsa: " + v.Motivo
+		}
 		riga("%s", s)
 	}
 }

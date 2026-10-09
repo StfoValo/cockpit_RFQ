@@ -24,35 +24,45 @@ import (
 //   - Scenario: lo scenario della richiesta inoltrata (scenario_inoltro); nil se la sezione è vuota.
 //   - Baseline, Reali, DaRivedere: le voci di file della baseline delle decisioni, dei file reali d'archivio e della C5.
 //   - Albero, Integrazione: gli ID e gli sha256 della conferma dell'albero e dei casi d'integrazione (controllo n.2).
-//   - RigheAlbero: i percorsi delle righe della conferma dell'albero, che il runner non verifica (R-109: i nonFatti
-//     degli invarianti della C5).
+//   - ThreadDaRivedere, ClienteDaRivedere: il thread della sezione C5 e il suo cliente, se è scritto con l'UUID
+//     (controllo n.2; T-B6c-08).
+//   - DecisoDaRivedere: chi ha deciso la C5 della sezione, con la sigla o l'UUID di un utente (controllo n.2; C-05,
+//     T-B6c-15). Campo facoltativo: assente, il JSON resta quello di prima.
+//   - RigheAlbero: i percorsi delle righe della conferma dell'albero, che il runner non verifica: stanno nella sezione
+//     informativa del rapporto righe_conferma_albero (R-109; D-R116 I, decisa dall'utente l'08/10).
 //   - Fonti: gli sha256 delle fonti (controllo n.3, con -exports).
 //   - Riportate: le sezioni descrittive e le note, riga per riga, per il rapporto.
 //   - NonTradotte: le chiavi che il runner non conosce (controllo n.5); Errori: i valori che non si leggono.
 //   - ChiaviLibere: nelle sezioni a forma libera (casi_integrazione, conferma_albero, fonti) le chiavi che non sono ID
-//     né sha256, con il percorso: un elenco informativo «chiavi libere non verificate», che non cambia l'uscita (R-109).
+//     né sha256, e le chiavi descrittive delle sezioni e delle voci (T-B6c-04, T-B6c-06, T-B6c-08), con il percorso: un
+//     elenco informativo «chiavi libere non verificate», che non cambia l'uscita (R-109).
 type SezioniAttesi struct {
-	Scenario     *ScenarioAtteso `json:"scenario,omitempty"`
-	Baseline     []VoceAttesa    `json:"baseline,omitempty"`
-	Reali        []VoceAttesa    `json:"reali,omitempty"`
-	DaRivedere   []VoceAttesa    `json:"da_rivedere,omitempty"`
-	Albero       []IDAtteso      `json:"albero,omitempty"`
-	Integrazione []IDAtteso      `json:"integrazione,omitempty"`
-	RigheAlbero  []string        `json:"righe_albero,omitempty"`
-	Fonti        []string        `json:"fonti,omitempty"`
-	Riportate    []RigaRiportata `json:"riportate,omitempty"`
-	NonTradotte  []string        `json:"non_tradotte,omitempty"`
-	Errori       []string        `json:"errori,omitempty"`
-	ChiaviLibere []string        `json:"chiavi_libere,omitempty"`
+	Scenario          *ScenarioAtteso `json:"scenario,omitempty"`
+	Baseline          []VoceAttesa    `json:"baseline,omitempty"`
+	Reali             []VoceAttesa    `json:"reali,omitempty"`
+	DaRivedere        []VoceAttesa    `json:"da_rivedere,omitempty"`
+	Albero            []IDAtteso      `json:"albero,omitempty"`
+	Integrazione      []IDAtteso      `json:"integrazione,omitempty"`
+	ThreadDaRivedere  *IDAtteso       `json:"thread_da_rivedere,omitempty"`
+	ClienteDaRivedere *IDAtteso       `json:"cliente_da_rivedere,omitempty"`
+	DecisoDaRivedere  *IDAtteso       `json:"deciso_da_rivedere,omitempty"`
+	RigheAlbero       []string        `json:"righe_albero,omitempty"`
+	Fonti             []string        `json:"fonti,omitempty"`
+	Riportate         []RigaRiportata `json:"riportate,omitempty"`
+	NonTradotte       []string        `json:"non_tradotte,omitempty"`
+	Errori            []string        `json:"errori,omitempty"`
+	ChiaviLibere      []string        `json:"chiavi_libere,omitempty"`
 }
 
 // ScenarioAtteso: la sezione dello scenario. ThreadID, MessaggioID, AutoritaTarget e ProdottiConfermatiDB sono gli
-// ingressi che il controllo n.1 confronta con il file dei casi (T-B0-15; R29 a).
+// ingressi che il controllo n.1 confronta con il file dei casi (T-B0-15; R29 a). FonteQuantita: quella della sezione,
+// che vale per i prodotti attesi che non la scrivono (T-B6c-05).
 type ScenarioAtteso struct {
 	ThreadID             *uuid.UUID         `json:"thread_id,omitempty"`
 	MessaggioID          *uuid.UUID         `json:"messaggio_id,omitempty"`
 	AutoritaTarget       string             `json:"autorita_target,omitempty"`
 	ProdottiConfermatiDB *bool              `json:"prodotti_confermati_db,omitempty"`
+	FonteQuantita        string             `json:"fonte_quantita,omitempty"`
 	Prodotti             []ProdottoScenario `json:"prodotti,omitempty"`
 	Conteggi             []ConteggioAtteso  `json:"conteggi,omitempty"`
 	File                 []VoceAttesa       `json:"file,omitempty"`
@@ -78,19 +88,25 @@ type ConteggioAtteso struct {
 // VoceAttesa: una voce di file di una sezione, com'è scritta, prima della traduzione.
 //   - Sezione: il nome neutro (confronto.Sezione*); Percorso: dove sta negli attesi.
 //   - AllegatoID, Sha256, NomeFile: il file (il legame si fa per AllegatoID; lo sha256 si controlla, n.2).
+//   - ThreadID: il thread del file, se la voce lo scrive (il n.2 lo confronta con il thread dell'allegato).
 //   - Atteso, AttesoStato, TargetBase, Radici, Autorita: la collocazione attesa dello scenario (radice | figlio |
 //     fuori), lo stato atteso (candidato_scenario | fuori_scenario), la base del target, le basi delle radici,
-//     l'autorità. TargetBaseScritto e RadiciScritte dicono se la chiave c'era.
+//     l'autorità. TargetBaseScritto e RadiciScritte dicono se la chiave c'era. Per la C5, Atteso è l'esito atteso del
+//     file, se la voce lo scrive come valore (T-B6c-07).
 //   - StatoAtteso: definito | riservato; DipendeDa: la domanda aperta da cui il caso dipende.
-//   - Letture: la mappa «atteso» delle letture del file (baseline, reali), con le chiavi della tabella dei casi.
-//   - Proposta, Documento, Export: le righe attese di proposta e di documento, e quella dell'export, campo per campo.
+//   - Letture: la mappa «atteso» delle letture del file (baseline, reali; la C5, se la scrive come mappa), con le
+//     chiavi della tabella dei casi.
+//   - Proposta, Documento, Export: le righe attese di proposta e di documento, e quella dell'export (la chiave
+//     nell_export_proposte della C5), campo per campo.
 //   - Invarianti: le chiavi booleane della voce; EsitoConTarget: l'esito con il target dei file reali, com'è scritto.
-//   - Riportate: note, etichette e anomalie, solo per il rapporto.
+//   - Riportate: note, etichette, anomalie, l'esito con il target e il codice dei file dello scenario, solo per il
+//     rapporto.
 type VoceAttesa struct {
 	Sezione               string             `json:"sezione"`
 	Percorso              string             `json:"percorso"`
 	ID                    string             `json:"id,omitempty"`
 	AllegatoID            *uuid.UUID         `json:"allegato_id,omitempty"`
+	ThreadID              *uuid.UUID         `json:"thread_id,omitempty"`
 	Sha256                string             `json:"sha256,omitempty"`
 	NomeFile              string             `json:"nome_file,omitempty"`
 	Atteso                string             `json:"atteso,omitempty"`
@@ -296,9 +312,14 @@ func traduci(s SezioniAttesi, f fotorfq.Fotografia, ix indiceFoto, ins *motorea.
 				sezioniDi[id] = append(sezioniDi[id], v.Sezione+" ("+v.Percorso+")")
 			}
 			// nome_file si verifica: il legame è per allegato, ma un nome diverso dice che gli attesi e i dati non
-			// parlano dello stesso file (la regola delle chiavi accettate).
+			// parlano dello stesso file (la regola delle chiavi accettate). Così thread_id della voce (B6c): è il thread
+			// dell'allegato nella fotografia, non solo un thread che si risolve (un allegato fuori RFQ non ne ha;
+			// T-B6c-14).
 			if v.NomeFile != "" && ra.allegato.NomeFile != v.NomeFile {
 				tr.nomi = append(tr.nomi, v.Percorso+".nome_file: non è il nome dell'allegato nella fotografia")
+			}
+			if v.ThreadID != nil && (ra.fuori || ra.thread != *v.ThreadID) {
+				tr.nomi = append(tr.nomi, v.Percorso+".thread_id: non è il thread dell'allegato nella fotografia")
 			}
 		}
 		var tb string
@@ -481,6 +502,11 @@ func fileAttesoDi(v VoceAttesa, allegato uuid.UUID, targetBaseline string) (conf
 		if fa.BaseLetta == "" {
 			errori = append(errori, "la voce non dice atteso.base: il controllo (2) della baseline non ha un valore")
 		}
+		// decisioni_invariate è il controllo (1) della baseline (6.4.9): vero, lo verificano le righe; falso, la voce si
+		// contraddice, perché la baseline è fatta di decisioni preservate (T-B6c-01).
+		if b, ok := v.invariante("decisioni_invariate"); ok && !b {
+			errori = append(errori, "atteso.decisioni_invariate falso: una voce della baseline è una decisione preservata (6.4.9, controllo (1))")
+		}
 	case confronto.SezioneReali:
 		if fa.Riservato == "" {
 			if v.EsitoConTargetScritto {
@@ -490,15 +516,23 @@ func fileAttesoDi(v VoceAttesa, allegato uuid.UUID, targetBaseline string) (conf
 			}
 		}
 	case confronto.SezioneDaRivedere:
+		// L'atteso della C5 scritto come valore è l'esito del file: la C5 è da_rivedere (P-10; 6.4.9, la C5 nel
+		// runner), e un altro valore contraddice la sezione (T-B6c-07).
+		if v.Atteso != "" && v.Atteso != string(confronto.EsitoDaRivedere) {
+			errori = append(errori, fmt.Sprintf("atteso %q: un file della C5 è %s (P-10)", v.Atteso, confronto.EsitoDaRivedere))
+		}
 	}
 	return fa, errori
 }
 
 // I campi che una riga attesa può portare, perché la riga della fotografia li ha (fotorfq.PropostaAttuale e
-// fotorfq.DocumentoConfermato): la proposta (anche la riga dell'export della C5) e il documento.
+// fotorfq.DocumentoConfermato): la proposta (anche la riga dell'export della C5) e il documento. Da B6c (T-B6c-02) la
+// proposta ha anche il suo ID; il documento il thread, l'estensione e chi l'ha confermato, e la provenienza: l'allegato
+// (uno di DocumentoConfermato.Allegati) e il messaggio (quello di un allegato del documento nella fotografia).
 var (
-	campiProposta  = []string{"codice", "rev", "componente_id", "stato", "fonte", "tipo", "tipo_proposto", "deciso_il", "deciso_da"}
-	campiDocumento = []string{"codice", "rev", "componente_id", "documento_id", "tipo", "sostituito_da", "confermato_il", "sha256", "nome_file"}
+	campiProposta  = []string{"codice", "rev", "componente_id", "stato", "fonte", "tipo", "tipo_proposto", "deciso_il", "deciso_da", "proposta_id"}
+	campiDocumento = []string{"codice", "rev", "componente_id", "documento_id", "tipo", "sostituito_da", "confermato_il", "sha256", "nome_file",
+		"allegato_id", "messaggio_id", "thread_id", "estensione", "confermato_da"}
 )
 
 // campiDellaRiga (R-102): un campo che la riga attesa non può avere, perché quella riga della fotografia non lo porta
@@ -510,7 +544,7 @@ func campiDellaRiga(v VoceAttesa) []string {
 		nome    string
 		riga    []CampoAtteso
 		ammessi []string
-	}{{"decisione_proposta", v.Proposta, campiProposta}, {"nell_export_0848", v.Export, campiProposta}, {"decisione_documento", v.Documento, campiDocumento}} {
+	}{{"decisione_proposta", v.Proposta, campiProposta}, {"nell_export_proposte", v.Export, campiProposta}, {"decisione_documento", v.Documento, campiDocumento}} {
 		for _, c := range r.riga {
 			if !dentro(c.Nome, r.ammessi) {
 				errori = append(errori, fmt.Sprintf("%s.%s: quella riga della fotografia non ha il campo", r.nome, c.Nome))

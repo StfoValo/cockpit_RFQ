@@ -129,14 +129,18 @@ markmap:
   - i controlli del runner 1–5, la traduzione, i controlli (1) e (2) della baseline, gli invarianti della C5, le
     letture attese dei file (`controlloLetture`, con le regole della tabella dei casi), il file dei casi contro la
     fotografia, i clienti degli export, la copia del manifest e la sola lettura (`controllaCopia`, `solaLetturaDi`),
-    le impronte del confronto; il contesto della corsa (`contestoCorsa`).
+    le impronte del confronto; il contesto della corsa (`contestoCorsa`); da B6c le righe decise con le loro fonti
+    (`fontiRighe`: la sigla di chi ha deciso o confermato, la provenienza del documento), gli ambiti della sezione dei
+    reali (`ambitiDellaSezione`, D-R116 O) e le righe della «Conferma l'albero» per la sezione informativa (D-R116 I).
 - **`gate.go`** (A1c) — responsabilità:
   - `Gate`, `VoceGate`, `calcolaGate` (le sette voci, una per una, con la classe e l'esito), l'uscita con `-gate`;
     `RevisioniDellaBaseline`, le differenze di revisione diagnosticate accanto alle decisioni preservate (R113 B).
 - **`classi.go`** (A1c) — responsabilità:
   - la classe e l'esito tri-stato di ogni controllo e di ogni voce del gate (R116 B, precisata dall'utente il 07/10):
     `ClasseControllo`, `EsitoTriStato`, `ControlloDelegato` (R117 b), la tabella statica delle classi con la
-    motivazione, la fonte e, per gli esterni, la prova; il riepilogo `Chiusura`.
+    motivazione, la fonte e, per gli esterni, la prova; il riepilogo `Chiusura`; da B6c le decisioni dell'utente
+    dell'08/10 (D-R116 I, O, F; D-R115 A; D-R114 B) nelle righe della tabella, e la riga fuori perimetro della parte del
+    n.1 con gli export (`ParteFinitiConGliExport`).
 - **`prodotti.go`** (A1c) — responsabilità:
   - la sezione informativa `prodotti` (i sette assi, lo stato, il fascicolo, i conflitti; «non calcolato» dove manca
     una sezione: T-12) e la fonte contro l'atteso dei prodotti attesi dello scenario (`fontiDelloScenario`, PO-29, con
@@ -144,9 +148,10 @@ markmap:
     una lettera. Lettura [T]: la regola del runner (la A del testo della domanda) resta valida, con la derivazione dagli
     attesi esplicita e indipendente dal motore (E2 §2.3).
 - **`rapporto_banco.go`** (A1c) — responsabilità:
-  - `RapportoBanco` (versione 3) e le sue sezioni, con i dettagli dei controlli (`DettaglioControllo`: le differenze e
-    le parti non verificate una per una), `PrimaRiga`, `Testo`, `scriviRapportoBanco` (`rapporto-dsn.json` e `.txt`,
-    `rapporto-exports.json` e `.txt`).
+  - `RapportoBanco` (versione 3) e le sue sezioni, con i dettagli dei controlli (`DettaglioControllo`: le differenze,
+    le parti non verificate, non applicabili e fuori perimetro una per una) e la sezione informativa delle righe della
+    «Conferma l'albero» (`RigheInformative`, D-R116 I), `PrimaRiga`, `Testo`, `scriviRapportoBanco`
+    (`rapporto-dsn.json` e `.txt`, `rapporto-exports.json` e `.txt`).
 - **`attesi.go`**, in più da A1c: `LeggiSezioni`, la lettura stretta delle sezioni (unico file con la libreria YAML).
 
 ## Entry point
@@ -242,14 +247,64 @@ markmap:
   runner accetta è verificata, oppure è dichiarata non verificata fra le parti non eseguite del controllo che la
   riguarda, con il percorso e senza valori; il controllo senza differenze è allora NON ESEGUITO. Mai accettata e
   buttata. I dettagli dei controlli nel rapporto le elencano una per una. Così, per esempio: `deciso_da` con gli
-  export (R-102); le righe della conferma dell'albero (R-109); le letture senza ambito di un file con
-  l'interpretazione parziale. Un campo che una riga della fotografia non ha (per esempio `confermato_il` in una
-  proposta) è un errore di traduzione. Due eccezioni, che non cambiano l'uscita: la riga della C5 dell'altra modalità
-  (la decisione con gli export, la riga dell'export con `-dsn`) non si applica alla corsa, perché il piano la assegna
-  all'altra modalità, e sta fra le parti «non applicabili» dei dettagli (R-117); nelle sezioni a forma libera le chiavi
-  che non sono ID vanno in un elenco informativo, «chiavi libere non verificate». `scritture_consentite` dello scenario,
-  un invariante del prodotto, la dichiara la voce del gate «zero scritture di dominio» (R-118). Accanto al percorso il
-  rapporto porta l'`id` della voce: negli esiti, nella baseline e nell'indice `attesi.id_voci` (R-119).
+  export (R-102); le letture senza ambito di un file con l'interpretazione parziale. Un campo che una riga della
+  fotografia non ha (per esempio `confermato_il` in una proposta) è un errore di traduzione. Le eccezioni, che non
+  cambiano l'uscita: la riga della C5 dell'altra modalità (la decisione con gli export, la riga dell'export con `-dsn`)
+  non si applica alla corsa, perché il piano la assegna all'altra modalità, e sta fra le parti «non applicabili» dei
+  dettagli (R-117); nelle sezioni a forma libera le chiavi che non sono ID, e da B6c le chiavi descrittive delle sezioni
+  e delle voci che il piano non fa confrontare, vanno in un elenco informativo, «chiavi libere non verificate», e il
+  valore si riporta; le righe della «Conferma l'albero» stanno nella sezione informativa `righe_conferma_albero` (D-R116
+  I); le parti fuori perimetro per una decisione dell'utente (D-R116 F) stanno fra le parti «fuori perimetro» dei
+  dettagli. `scritture_consentite` dello scenario, un invariante del prodotto, la dichiara la voce del gate «zero
+  scritture di dominio» (R-118). Accanto al percorso il rapporto porta l'`id` della voce: negli esiti, nella baseline e
+  nell'indice `attesi.id_voci` (R-119).
+- **Le chiavi della prima corsa vera** (B6c, 08/10: 37 chiavi non tradotte, ognuna con il suo trattamento, con le
+  sigle T-B6c-nn dove il piano non lo scrive; nessuna ignorata):
+  - nella voce: `thread_id` (baseline, C5), che deve essere il thread dell'allegato nella fotografia (n.2, T-B6c-14);
+    `codice` dei file dello scenario, descrittiva: si riporta ed è fra le chiavi libere (il piano non lo fa confrontare,
+    e il significato di un codice del cliente il runner non lo decide: T-B6c-04); `atteso` della C5 scritto come valore,
+    l'esito del file, che deve essere `da_rivedere` (P-10), oppure come mappa di letture, giudicata come quelle dei
+    reali (T-B6c-07, da ratificare);
+  - dentro `atteso` (T-B6c-01): della baseline `componente_id_proposta_vuoto_preservato` (il (5) della baseline),
+    `decisioni_invariate` (il controllo (1): vero lo verificano le righe, e senza righe resta non verificato; falso è un
+    errore di traduzione) e `revisione_confrontata_separatamente` (la riga di confronto ha l'indicatore di revisione
+    accanto al badge: E-19, R31; falso è una differenza); dei reali `target_presente` (R70 A) ed `esito_con_target`
+    (null vuol dire «non ancora scritto»; scritto, la voce resta riservata e l'esito si riporta: T-B6c-03);
+    `token_00_conservato` è `token_conservato` (6.4.9, «Traduzione degli attesi»; C-30), solo nelle sezioni di A1c
+    (T-B6c-13);
+  - nelle righe decise, i campi che la riga della fotografia porta (la regola delle chiavi accettate): `proposta_id`;
+    del documento `thread_id`, `estensione`, `confermato_da` (la sigla, qui sotto) e la provenienza (T-B6c-02):
+    `allegato_id` fra gli allegati della provenienza del documento (una differenza dove la fotografia l'avrebbe: con le
+    provenienze complete, o con un allegato del thread del documento; altrimenti non si decide), `messaggio_id` come il
+    messaggio, nella fotografia, dell'allegato della stessa riga (il prodotto scrive la provenienza con l'allegato e il
+    suo messaggio; la fotografia non porta `documento_provenienza.messaggio_id`, e non c'è SQL nuovo); un null, o ciò che
+    la fotografia non sa dire, è una parte non verificata;
+  - nella C5 (T-B6c-08): `thread_id` (anche vuoto) e `cliente` con l'UUID vanno al n.2 (il thread si risolve, il
+    cliente è il suo); `deciso_da` (anche vuoto) va al n.2, che lo cerca fra gli utenti della fotografia (C-05,
+    T-B6c-15, proposta tecnica; il piano 6.5: `ListSigleUtenti` serve al `deciso_da` degli attesi C5); `anomalie`
+    riportate (6.4.9, la C5 nel runner); `decisione`, `fonte`, `intervallo`, `regole`, `stato` e un `cliente` scritto con
+    il nome (o vuoto) descrivono la sezione: riportati, fra le chiavi libere;
+  - nello scenario: `fonte_quantita` della sezione vale per i prodotti che non la scrivono, e uno che ne scrive una
+    diversa è un errore (T-B6c-05); `origine_atteso` riportata, fra le chiavi libere (T-B6c-06); i conteggi (T-B6c-09;
+    6.4.9: «8 radice, 28 figlio (22 con due radici), 13 fuori richiesta») `candidati_radice` e `candidati_figlio` (i
+    file attesi radice e figlio), `file_condivisi` (i figli con più di una radice), `allegati` (le voci, una per
+    allegato) contro le voci (n.5) e, i primi tre, contro gli esiti corretti (voce 2 del gate); `hash_distinti` contro
+    gli sha256 distinti degli allegati delle voci nella fotografia (n.2).
+- **La sigla nei campi `deciso_da` e `confermato_da`**: la C5 li scrive con la sigla dell'utente (il piano: 6.5,
+  `ListSigleUtenti`), la fotografia con l'UUID. Un valore atteso che è un UUID (o null) si confronta come prima. Con
+  `-dsn` una sigla si confronta, alla lettera, con quella dell'utente della fotografia con quell'UUID (`fotorfq.Utente`):
+  un campo assente, un utente che la fotografia non ha (anche se non ne ha nessuno: la copia li ha tutti) o una sigla
+  diversa sono differenze. Con gli export `deciso_da` resta non confrontabile (R-102), e una sigla di `confermato_da`
+  non si confronta: gli export non hanno gli utenti, ed è una parte non verificata. La regola è la stessa per ogni riga
+  decisa confrontata, C5 e baseline (T-B6c-10). Nessun SQL nuovo.
+- **Chi ha deciso la sezione C5** (`decisioni_successive_da_rivedere.deciso_da`; C-05, T-B6c-15): con `-dsn` una sigla
+  deve essere, alla lettera, la sigla di un utente della fotografia, e un UUID l'ID di un utente; altrimenti è una
+  differenza (anche con la fotografia senza utenti: con `-dsn` ci sono tutti). Un valore vuoto non nomina un utente ed è
+  una parte non verificata. Con gli export gli utenti non ci sono: la parte è NON VERIFICATA (R-102), mai un passato. La
+  sezione non dice quale riga abbia deciso: si verifica che sia un utente; le righe le verificano le voci.
+- **`nell_export_proposte`**: il nome neutro della riga dell'export della C5 (il nome di prima portava un frammento del
+  nome di un file dell'export; come M-21, solo lessicale: valori e significato invariati). La chiave di prima è una
+  chiave non tradotta come le altre: nessun alias, e nel codice nessun altro nome `nell_export_…`.
 - **Le letture attese dei file** della baseline (oltre a `base`, che è il controllo (2)) e dei file reali si
   confrontano con l'interpretazione del file, con le regole della tabella dei casi (R-101); `target_presente` con il
   predicato di R70 A; `nome_file` contro il nome dell'allegato (n.2); `mostrata_con_badge_di_confronto` contro le righe
@@ -264,7 +319,16 @@ markmap:
   vuota) è fra le parti non verificate, «ambito dedotto, asserzione negativa», perché su un'unità più stretta del file
   passerebbe a vuoto; un'asserzione positiva si giudica, e i dettagli del controllo dicono su quale unità
   (`ambiti_dedotti`, nel riepilogo «ambito dedotto: …»), solo come informazione.
-  Le chiavi senza ambito vogliono l'interpretazione completa.
+  Le chiavi senza ambito vogliono l'interpretazione completa. Le letture parziali restano obbligatorie (D-R116 O,
+  decisa dall'utente l'08/10): si giudicano i valori disponibili, e il resto si dichiara parziale. La verifica minima:
+  la base dei reali è quella del nome dell'archivio (il piano: 4.6.10, la forma `nome-token` su `nome_file`; 6.4.9, la
+  tabella delle sezioni; A1c-L4D-10, gli archivi senza fatti), quindi prende l'ambito del nome (T-B6c-12), **solo se il
+  nome è tutto il file** (C-04, che restringe T-B6c-12): ogni unità del documento è del nome, nessuna è troncata,
+  nessun limite è superato (né nei limiti della fonte né fra le diagnostiche dell'interpretazione). Allora giudicare sul
+  nome equivale a giudicare sul file intero, ed è il caso degli archivi senza contenuto. La sola presenza di una base nel
+  nome non basta: con un contenuto letto in parte la chiave torna alla regola del file intero e resta NON VERIFICATA,
+  con il motivo di A1b-22 e quello di C-04 accanto; lo stesso per `token_00_conservato`, che dalla base prendeva
+  l'ambito. Le chiavi di unicità del file intero restano sul file intero, e con il documento parziale non si giudicano.
 - **Il file dei casi contro la fotografia**, sempre: un thread o un messaggio di un caso che la fotografia non ha è
   una differenza (con `-dsn`: il file dei casi contraddice i dati); con gli export i messaggi che mancano per
   costruzione (solo quelli in entrata) sono parti non verificabili (T-B6-74, T-B6-112).
@@ -294,17 +358,29 @@ markmap:
   - obbligatori esterni: le sentinelle (A1c-L4D-01), le voci del gate «zero scritture» (A1c-L4D-12, A1c-L4S-09),
     «motore senza LLM» (A1c-L4S-08, A1c-L4T-01, G1, G5) e «forme dei profili» (le etichette, M-22, R58 B);
   - informativi: le sezioni prodotti, correzioni manuali, profilo dei limiti, censimento, parti non applicabili,
-    chiavi libere;
-  - fuori dal perimetro: PO-30 (E1 §11; R110, precisata dall'utente il 07/10);
-  - restano obbligatori, con la nota «classe da decidere dall'utente (D-R116)», il n.1 (con gli export, senza i
-    finiti), la C5 (le righe della «Conferma l'albero») e le letture (i file con l'interpretazione parziale, fuori dal
-    nome); resta obbligatorio `clienti_degli_export`, con la nota «classe da decidere dall'utente (D-R115)». Le sigle
-    sono quelle delle decisioni aperte in domande-a1c.md;
+    chiavi libere, righe della «Conferma l'albero» (`righe_conferma_albero`);
+  - fuori dal perimetro: PO-30 (E1 §11; R110, precisata dall'utente il 07/10); `clienti_degli_export` (D-R115 A); con
+    gli export, la parte del n.1 senza i finiti (`runner_1_finiti_con_gli_export`, D-R116 F), elencata nella chiusura
+    solo quando la corsa ne ha;
+  - le decisioni dell'utente dell'08/10 sulle parti che erano «da classificare», ognuna un'esclusione specifica e
+    motivata, ratificata, come le sentinelle: D-R116 I, le righe legacy della «Conferma l'albero» sono informative, e
+    gli invarianti della C5 restano obbligatori per i file confermati; D-R116 O, le letture parziali restano
+    obbligatorie (si giudicano i valori disponibili, il resto si dichiara parziale); D-R116 F, con gli export il n.1
+    senza i finiti è fuori perimetro, coerente con D-R115 A (la parte sta fra le parti «fuori perimetro» dei dettagli,
+    e il motivo del n.1 le conta: un n.1 passato con una parte esclusa non si legge come passato per intero, T-B6c-11);
+    D-R115 A, `clienti_degli_export` è fuori perimetro, con la non coerenza degli identificativi nel motivo, lo stato NON
+    ESEGUITO e l'uscita 3;
   - una voce che la tabella non conosce è obbligatoria per difetto: nessuna esenzione generica.
 - **La chiusura** (`Chiusura`, R116 B) distingue la conclusione della parte obbligatoria del runner dall'incompletezza
   del rapporto: gli obbligatori del runner, conclusi o no; gli obbligatori esterni, ognuno con la sua prova, da
-  chiudere nel registro; gli informativi incompleti; i fuori perimetro con la motivazione. Né le classi né la chiusura
-  cambiano l'uscita: una differenza resta 1, un controllo non eseguito resta 3, e il 3 non diventa mai 0. L'unica riga
+  chiudere nel registro; gli informativi incompleti; i fuori perimetro con la motivazione e, per un controllo, l'esito
+  della corsa. Né le classi né la chiusura cambiano l'uscita: una differenza resta 1, un controllo non eseguito resta 3,
+  e il 3 non diventa mai 0. Il rapporto è completo solo senza nessun controllo NON ESEGUITO, di nessuna classe: un
+  controllo fuori perimetro e non eseguito (`clienti_degli_export`, D-R115 A) esce dagli obbligatori del runner, ma il
+  rapporto resta incompleto (T-B6c-11). Le righe informative della «Conferma l'albero» (D-R116 I) e le chiavi libere
+  restano fra gli informativi incompleti: sui dati veri `rapporto_completo` resta falso anche con tutte le parti
+  obbligatorie verificabili concluse. È la scelta prudente decisa per B6c (D-1): una parte informativa non verificata
+  non diventa «superata», e la chiusura non ha un predicato diverso. L'unica riga
   che non decide l'uscita è quella delle sentinelle, «delegato», un'esclusione specifica e motivata (R117 b): vale solo
   per l'ambiente della copia intatta (il database della sezione copia del manifest); senza quel database dichiarato
   resta NON ESEGUITA.
@@ -312,8 +388,10 @@ markmap:
   vuol dire che un documento confermato porta il file (T-B6-52). La misura è quella di `confronto` (R114, precisata
   dall'utente il 07/10), sommata campo per campo: un indicatore ricostruito delle correzioni necessarie, non il tempo
   risparmiato, con il denominatore (i valutabili), la copertura (valutabili su decisi) e gli esclusi per motivo (che
-  hanno preso il posto del vecchio «prima per stringa»); `prima` e `prima_marcatore` restano separati, perché la scelta
-  del titolo è aperta (D-R114); «dopo» ha tre parti: false associazioni, ambiguità, astensioni. Fuori dalla misura il
+  hanno preso il posto del vecchio «prima per stringa»); il titolo «prima» del riepilogo è base più marcatore
+  (`prima + prima_marcatore`, con le due parti accanto), e il marcatore da un solo lato resta a parte (D-R114 B, decisa
+  dall'utente l'08/10: solo il testo; nel JSON i due conteggi restano separati); «dopo» ha tre parti: false
+  associazioni, ambiguità, astensioni. Fuori dalla misura il
   rapporto conta la stessa base su un altro target (su tutti i decisi) e la revisione vecchia solo nella colonna rev
   (R-65), divisa per lo stato della lettura della colonna con la regola della famiglia (R113 B ratificata;
   `RevisioneInColonna`): letta, nessuna regola, non interpretabile, ambigua, e a parte i file non valutati il cui stato
@@ -349,8 +427,11 @@ markmap:
   il controllo `clienti_degli_export` è NON ESEGUITO, e per quei thread ciò che dipende dalla valutazione (la base
   della baseline, il predicato del n.1, le letture, gli esiti nel gate) è fra le parti non verificate, mai fra le
   differenze: l'uscita è 3 (T-B6-104). R115 A, ratificata dall'utente il 07/10 con un vincolo: un export nuovo non si
-  mescola al campione del 02/10, che resta con questo limite dichiarato; gli export nuovi possono formare un campione
-  separato, con un manifest suo (D-R115 aperta).
+  mescola al campione del 02/10, che resta con questo limite dichiarato. D-R115 A, decisa dall'utente l'08/10: il limite
+  è accettato (l'export dei clienti è di prima della ricreazione del DB, con UUID diversi; non è un difetto del motore
+  né delle migrazioni); il motivo del controllo registra la non coerenza degli identificativi, con il numero dei
+  thread; la classe è `fuori_perimetro`, lo stato resta NON ESEGUITO e l'uscita 3. Gli export non si toccano, nessun
+  collegamento fra UUID si crea, gli attesi non cambiano.
 - **Il gate non dà mai per superato ciò che non ha visto**: una voce dello scenario o della baseline non risolta o non
   verificabile rende non eseguite le false associazioni e le decisioni preservate (una decisione con una parte non
   verificata non è preservata, R-102); un prodotto in più del motore non supera i conteggi (R-108); una voce della C5
@@ -422,6 +503,16 @@ markmap:
     la scena;
   - **`revisione_colonna_test.go`** (B6b) — R113, la parte del banco: la colonna per stato, le differenze di revisione
     della baseline nel gate, la provenienza da valutazione alla baseline, la scena;
+  - **`prima_corsa_test.go`** (B6c) — ciò che la prima corsa vera chiede al banco: le 37 chiavi della corsa tutte nella
+    forma della prova, lette e verificate sulla scena, ognuna con la sua differenza quando cambia; i conteggi della
+    corsa nel gate; `nell_export_proposte` senza alias; la sigla nei campi `deciso_da` e `confermato_da`, con `-dsn` e
+    con gli export; la provenienza del documento (T-B6c-02); le righe della «Conferma l'albero» informative (D-R116 I);
+    la base dei reali dal nome e `token_00_conservato` (D-R116 O), solo se il nome è tutto il file (C-04); chi ha deciso
+    la sezione C5 fra gli utenti (C-05); i campi nuovi del rapporto facoltativi, con la versione 3 (D-6); il n.1 dei
+    finiti fuori perimetro con gli export
+    (D-R116 F); i clienti degli export fuori perimetro con l'uscita 3, e il rapporto mai completo con un controllo non
+    eseguito (D-R115 A, T-B6c-11). Il titolo della misura (D-R114 B) è in `sezioni_rapporto_test.go`, la tabella delle
+    classi in `risposte_test.go`;
   - **`banco_db_test.go`** (tag `integrazione`, L4) — la sequenza `-dsn` sul DB di prova, fermata dal ruolo che
     scrive, con le tabelle escluse «non controllate».
 - `cmd/bancoa/main_test.go` prova flag e codici d'uscita del comando (0, 1, 2, 3); da A1c anche A1c-L1-27 (i flag

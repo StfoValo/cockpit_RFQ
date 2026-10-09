@@ -290,10 +290,12 @@ func valoreDi(n *yaml.Node) ValoreAtteso {
 //
 // Le sezioni descrittive (gate, riservati_non_bloccanti, prerequisiti_gate_l4) e le note si riportano nel rapporto come
 // righe «percorso = valore», senza interpretarle; da casi_integrazione e da conferma_albero si raccolgono gli ID e gli
-// sha256, per il controllo n.2, e i percorsi delle righe della conferma dell'albero, che il runner dichiara non
-// verificate (R-109); da fonti solo gli sha256, per il controllo n.3. Nelle tre sezioni a forma libera le chiavi che
-// non sono ID vanno in ChiaviLibere, un elenco informativo che non cambia l'uscita (R-109). contratto_runner e profili
-// restano di A1a (i profili si legano ai clienti nel manifest, D-09).
+// sha256, per il controllo n.2, e i percorsi delle righe della conferma dell'albero, che il runner non verifica e che il
+// rapporto porta in una sezione informativa (R-109; D-R116 I, decisa dall'utente l'08/10); da fonti solo gli sha256,
+// per il controllo n.3. Nelle tre sezioni a forma libera le chiavi che non sono ID vanno in ChiaviLibere, un elenco
+// informativo che non cambia l'uscita (R-109); da B6c anche le chiavi descrittive delle sezioni e delle voci (descrittive,
+// T-B6c-04, T-B6c-06, T-B6c-08). contratto_runner e profili restano di A1a (i profili si legano ai clienti nel
+// manifest, D-09).
 //
 // L'errore è solo per un file che non è un documento YAML con una mappa in cima: allora non si legge niente.
 func LeggiSezioni(raw []byte) (SezioniAttesi, error) {
@@ -352,26 +354,58 @@ func LeggiSezioni(raw []byte) (SezioniAttesi, error) {
 
 // Le chiavi che il runner conosce in una voce di file, per sezione (6.4.6, 6.4.9; i nomi neutri di M-21). Le chiavi
 // comuni a tutte le voci: l'identità del file, le note, lo stato atteso del caso e la domanda da cui dipende.
+//
+// Da B6c (la prima corsa sugli attesi veri, 08/10) anche le chiavi che la corsa ha detto non tradotte, ognuna con il suo
+// trattamento: thread_id della voce (il thread dell'allegato, n.2); codice dei file dello scenario (descrittiva, fra le
+// chiavi libere: T-B6c-04); atteso della C5 (T-B6c-07); nell_export_proposte, il nome neutro della riga dell'export
+// della C5 (come M-21, solo lessicale: la chiave di prima non ha alias).
 var (
 	chiaviVoce     = []string{"id", "allegato_id", "sha256", "nome_file", "nota", "dipende_da", "stato_atteso"}
 	chiaviScenario = append(append([]string(nil), chiaviVoce...),
-		"atteso", "atteso_stato", "atteso_target_base", "radici", "autorita", "scritture_consentite")
+		"atteso", "atteso_stato", "atteso_target_base", "radici", "autorita", "scritture_consentite", "codice")
 	chiaviBaseline = append(append([]string(nil), chiaviVoce...),
-		"atteso", "decisione_proposta", "decisione_documento", "componente_id_proposta_vuoto_preservato")
+		"atteso", "decisione_proposta", "decisione_documento", "componente_id_proposta_vuoto_preservato", "thread_id")
 	chiaviReali = append(append([]string(nil), chiaviVoce...),
 		"atteso", "target_presente", "esito_con_target")
 	chiaviDaRivedere = append(append([]string(nil), chiaviVoce...),
-		"decisione_proposta", "decisione_documento", "nell_export_0848", "sovrascritta_dal_motore",
+		"decisione_proposta", "decisione_documento", "nell_export_proposte", "sovrascritta_dal_motore",
 		"componente_id_proposta_vuoto_preservato", "in_baseline", "conta_nel_gate", "mostrata_con_badge_di_confronto",
-		"anomalie", "etichetta")
+		"anomalie", "etichetta", "thread_id", "atteso")
 	// chiaviDecisione: i campi di una riga di proposta o di documento attesa (6.4.9, il controllo (1) della baseline e
-	// gli invarianti della C5): le colonne di documento_proposta e di documento che la fotografia porta.
+	// gli invarianti della C5): le colonne di documento_proposta e di documento che la fotografia porta. Da B6c anche
+	// proposta_id (la proposta), e per il documento la provenienza (allegato_id, messaggio_id), il thread, l'estensione e
+	// chi l'ha confermato (T-B6c-02); quali valgono per quale riga lo dice campiDellaRiga (sezioni.go).
 	chiaviDecisione = []string{"codice", "rev", "componente_id", "documento_id", "stato", "fonte", "tipo", "tipo_proposto",
-		"deciso_il", "deciso_da", "sostituito_da", "confermato_il", "sha256", "nome_file"}
-	// invariantiBooleani: le chiavi booleane di una voce, che il runner porta come invarianti (6.4.9).
+		"deciso_il", "deciso_da", "sostituito_da", "confermato_il", "sha256", "nome_file", "proposta_id", "allegato_id",
+		"messaggio_id", "thread_id", "estensione", "confermato_da"}
+	// invariantiBooleani: le chiavi booleane di una voce, che il runner porta come invarianti (6.4.9). Da B6c anche le
+	// due della baseline che la corsa ha trovato dentro atteso: decisioni_invariate (il controllo (1)) e
+	// revisione_confrontata_separatamente (l'indicatore di revisione, E-19).
 	invariantiBooleani = []string{"componente_id_proposta_vuoto_preservato", "sovrascritta_dal_motore", "in_baseline",
-		"conta_nel_gate", "mostrata_con_badge_di_confronto", "target_presente", "scritture_consentite"}
+		"conta_nel_gate", "mostrata_con_badge_di_confronto", "target_presente", "scritture_consentite",
+		"decisioni_invariate", "revisione_confrontata_separatamente"}
+	// chiaviDellaVoceInAtteso (T-B6c-01): le chiavi della voce che gli attesi scrivono dentro la mappa «atteso» delle
+	// letture, per sezione. Non sono letture del file: si leggono come le chiavi della voce (gli invarianti, l'esito con il
+	// target), con lo stesso significato. La stessa chiave nella voce e in atteso è un errore: un valore solo.
+	chiaviDellaVoceInAtteso = map[string][]string{
+		confronto.SezioneBaseline: {"componente_id_proposta_vuoto_preservato", "decisioni_invariate", "revisione_confrontata_separatamente"},
+		confronto.SezioneReali:    {"target_presente", "esito_con_target"},
+	}
+	// sinonimiDelleLetture: le chiavi delle letture dei file che il piano dà come lo stesso concetto di una chiave della
+	// tabella dei casi (6.4.9, «Traduzione degli attesi»; C-30: token_conservato e token_00_conservato). Valgono solo
+	// nelle sezioni di A1c: la tabella dei casi di A1a e le modalità regole e casi non cambiano (F0-01; T-B6c-13). Il
+	// percorso resta quello scritto negli attesi.
+	sinonimiDelleLetture = map[string]string{"token_00_conservato": "token_conservato"}
 )
+
+// chiaveDellaRegola: la chiave della tabella dei casi che giudica una chiave delle letture di un file (lei stessa, o
+// quella di cui è sinonimo).
+func chiaveDellaRegola(k string) string {
+	if s, ok := sinonimiDelleLetture[k]; ok {
+		return s
+	}
+	return k
+}
 
 // lettoreSezioni: lo stato della lettura delle sezioni.
 type lettoreSezioni struct {
@@ -510,18 +544,24 @@ func (l *lettoreSezioni) testiDi(n *yaml.Node, p string) []string {
 
 // scenario: la sezione dello scenario della richiesta inoltrata (scenario_inoltro, M-21): gli ingressi del caso che il
 // controllo n.1 confronta con il file dei casi, i prodotti attesi, i conteggi dichiarati e i file.
+//
+// Da B6c: fonte_quantita della sezione è quella dei prodotti attesi che non la scrivono (T-B6c-05: un prodotto che ne
+// scrive una diversa è un errore); origine_atteso dice da dove viene l'atteso, e si riporta, fra le chiavi libere: non è
+// un dato da confrontare (T-B6c-06).
 func (l *lettoreSezioni) scenario(n *yaml.Node, p string) {
 	m := l.mappa(n, p, []string{"thread_id", "messaggio_id", "autorita_target", "prodotti_confermati_db",
-		"prodotti_attesi", "conteggi", "file", "nota"})
+		"prodotti_attesi", "conteggi", "file", "nota", "fonte_quantita", "origine_atteso"})
 	if len(m) == 0 {
 		return
 	}
 	l.nota(m, p)
+	l.descrittive(m, p, "origine_atteso")
 	s := &ScenarioAtteso{
 		ThreadID:             l.uuidDi(m["thread_id"], p+".thread_id"),
 		MessaggioID:          l.uuidDi(m["messaggio_id"], p+".messaggio_id"),
 		AutoritaTarget:       l.testoDi(m["autorita_target"], p+".autorita_target"),
 		ProdottiConfermatiDB: l.booleanoDi(m["prodotti_confermati_db"], p+".prodotti_confermati_db"),
+		FonteQuantita:        l.testoDi(m["fonte_quantita"], p+".fonte_quantita"),
 	}
 	for i, e := range l.elencoDi(m["prodotti_attesi"], p+".prodotti_attesi") {
 		pe := fmt.Sprintf("%s.prodotti_attesi[%d]", p, i)
@@ -541,6 +581,12 @@ func (l *lettoreSezioni) scenario(n *yaml.Node, p string) {
 				l.errore(pe, "originale e codice_richiesto diversi")
 			}
 			pr.Originale = c
+		}
+		switch {
+		case pr.FonteQuantita == "":
+			pr.FonteQuantita = s.FonteQuantita
+		case s.FonteQuantita != "" && pr.FonteQuantita != s.FonteQuantita:
+			l.errore(pe+".fonte_quantita", "diversa da fonte_quantita dello scenario")
 		}
 		s.Prodotti = append(s.Prodotti, pr)
 	}
@@ -566,9 +612,41 @@ func (l *lettoreSezioni) scenario(n *yaml.Node, p string) {
 
 // daRivedere: la sezione delle decisioni successive da rivedere (la C5): i file confermati, ognuno da_rivedere, e la
 // conferma dell'albero, di cui si raccolgono gli ID.
+//
+// Da B6c le chiavi della sezione che la prima corsa ha detto non tradotte:
+//   - thread_id: il thread della sezione, che il n.2 risolve nella fotografia; cliente, se è un UUID: il cliente di quel
+//     thread (n.2). Un cliente scritto con il nome si riporta, fra le chiavi libere (T-B6c-08);
+//   - anomalie: si riportano nel rapporto (6.4.9, la C5 nel runner: «le anomalie della sezione compaiono solo nel
+//     rapporto»);
+//   - deciso_da: chi ha deciso la C5 della sezione, con la sigla (o l'UUID) di un utente; il n.2 lo cerca fra gli utenti
+//     della fotografia (C-05, T-B6c-15; il piano 6.5: ListSigleUtenti serve proprio al deciso_da degli attesi C5);
+//   - decisione, fonte, intervallo, regole, stato: descrivono la decisione C5 della sezione (quando, da dove, con quali
+//     regole); le righe decise stanno nelle voci, verificate una per una. Si riportano, e sono fra le chiavi libere non
+//     verificate (T-B6c-08).
 func (l *lettoreSezioni) daRivedere(n *yaml.Node, p string) {
-	m := l.mappa(n, p, []string{"file_confermati", "conferma_albero", "nota"})
+	m := l.mappa(n, p, []string{"file_confermati", "conferma_albero", "nota", "thread_id", "cliente", "anomalie",
+		"decisione", "deciso_da", "fonte", "intervallo", "regole", "stato"})
 	l.nota(m, p)
+	// Una chiave scritta non si butta mai: thread_id scritto (anche vuoto) va al n.2, che lo risolve o dà la differenza;
+	// cliente con un UUID va al n.2, altrimenti (un nome, un valore vuoto) è descrittiva.
+	if x, ok := m["thread_id"]; ok {
+		l.out.ThreadDaRivedere = &IDAtteso{Percorso: p + ".thread_id", Chiave: "thread_id", Valore: l.testoDi(x, p+".thread_id")}
+	}
+	if x, ok := m["cliente"]; ok {
+		if s := l.testoDi(x, p+".cliente"); uuid.Validate(s) == nil {
+			l.out.ClienteDaRivedere = &IDAtteso{Percorso: p + ".cliente", Chiave: "cliente_id", Valore: s}
+		} else {
+			l.descrittive(m, p, "cliente")
+		}
+	}
+	if a := m["anomalie"]; a != nil {
+		l.out.Riportate = append(l.out.Riportate, riporta(a, p+".anomalie")...)
+	}
+	// deciso_da scritto (anche vuoto) va al n.2, come thread_id: lo verifica o dice perché non si verifica (C-05).
+	if x, ok := m["deciso_da"]; ok {
+		l.out.DecisoDaRivedere = &IDAtteso{Percorso: p + ".deciso_da", Chiave: "deciso_da", Valore: l.testoDi(x, p+".deciso_da")}
+	}
+	l.descrittive(m, p, "decisione", "fonte", "intervallo", "regole", "stato")
 	l.out.DaRivedere = l.voci(m["file_confermati"], p+".file_confermati", confronto.SezioneDaRivedere, chiaviDaRivedere)
 	if a := m["conferma_albero"]; a != nil {
 		l.out.Albero = append(l.out.Albero, raccogliID(a, p+".conferma_albero")...)
@@ -581,6 +659,20 @@ func (l *lettoreSezioni) daRivedere(n *yaml.Node, p string) {
 func (l *lettoreSezioni) nota(m map[string]*yaml.Node, p string) {
 	if s := l.testoDi(m["nota"], p+".nota"); s != "" {
 		l.out.Riportate = append(l.out.Riportate, RigaRiportata{Percorso: p + ".nota", Valore: s})
+	}
+}
+
+// descrittive (T-B6c-06, T-B6c-08): le chiavi di una mappa già letta che descrivono la sezione e non sono dati da
+// confrontare. Il valore si riporta nel rapporto, riga per riga; il percorso va fra le chiavi libere non verificate, un
+// elenco informativo: accettate e dichiarate, mai buttate (la regola delle chiavi accettate).
+func (l *lettoreSezioni) descrittive(m map[string]*yaml.Node, p string, chiavi ...string) {
+	for _, k := range chiavi {
+		x, ok := m[k]
+		if !ok {
+			continue
+		}
+		l.out.Riportate = append(l.out.Riportate, riporta(x, p+"."+k)...)
+		l.out.ChiaviLibere = append(l.out.ChiaviLibere, indiciDegliElenchi.ReplaceAllString(p+"."+k, "[]"))
 	}
 }
 
@@ -601,13 +693,38 @@ func (l *lettoreSezioni) voci(n *yaml.Node, p, sezione string, note []string) []
 			StatoAtteso: l.testoDi(m["stato_atteso"], pe+".stato_atteso"),
 			AttesoStato: l.testoDi(m["atteso_stato"], pe+".atteso_stato"),
 			Autorita:    l.testoDi(m["autorita"], pe+".autorita"),
+			ThreadID:    l.uuidDi(m["thread_id"], pe+".thread_id"),
 		}
+		// percorso: dove sta una chiave della voce negli attesi (nella voce, o dentro atteso: T-B6c-01).
+		percorso := map[string]string{}
 		if x, ok := m["atteso"]; ok {
-			if sezione == confronto.SezioneScenario {
+			switch {
+			case sezione == confronto.SezioneScenario:
 				v.Atteso = l.testoDi(x, pe+".atteso")
-			} else {
-				v.Letture = l.lettureAttese(x, pe+".atteso")
+			case sezione == confronto.SezioneDaRivedere && !senzaValore(x) && risolvi(x).Kind == yaml.ScalarNode:
+				// L'atteso della C5 scritto come valore: l'esito del file, che la traduzione controlla (T-B6c-07).
+				v.Atteso = l.testoDi(x, pe+".atteso")
+			default:
+				var dellaVoce map[string]*yaml.Node
+				v.Letture, dellaVoce = l.lettureAttese(x, pe+".atteso", chiaviDellaVoceInAtteso[sezione])
+				for _, k := range chiaviDellaVoceInAtteso[sezione] {
+					y, ok := dellaVoce[k]
+					if !ok {
+						continue
+					}
+					if _, doppia := m[k]; doppia {
+						l.errore(pe+"."+k, "chiave ripetuta, nella voce e in atteso")
+						continue
+					}
+					m[k], percorso[k] = y, pe+".atteso."+k
+				}
 			}
+		}
+		dove := func(k string) string {
+			if q, ok := percorso[k]; ok {
+				return q
+			}
+			return pe + "." + k
 		}
 		if x, ok := m["atteso_target_base"]; ok {
 			v.TargetBaseScritto = true
@@ -617,9 +734,12 @@ func (l *lettoreSezioni) voci(n *yaml.Node, p, sezione string, note []string) []
 			v.RadiciScritte = true
 			v.Radici = l.testiDi(x, pe+".radici")
 		}
-		if x, ok := m["esito_con_target"]; ok {
+		// esito_con_target null (o vuoto) vuol dire «non ancora scritto dall'utente» (R21 c A; T-B6c-03); scritto, si
+		// riporta accanto all'esito del file.
+		if x, ok := m["esito_con_target"]; ok && !senzaValore(x) {
 			v.EsitoConTargetScritto = true
 			v.EsitoConTarget = strings.Join(riportaTesti(x), "; ")
+			v.Riportate = append(v.Riportate, "esito_con_target = "+v.EsitoConTarget)
 		}
 		if x, ok := m["decisione_proposta"]; ok {
 			v.Proposta = l.decisione(x, pe+".decisione_proposta")
@@ -627,12 +747,12 @@ func (l *lettoreSezioni) voci(n *yaml.Node, p, sezione string, note []string) []
 		if x, ok := m["decisione_documento"]; ok {
 			v.Documento = l.decisione(x, pe+".decisione_documento")
 		}
-		if x, ok := m["nell_export_0848"]; ok {
-			v.Export = l.decisione(x, pe+".nell_export_0848")
+		if x, ok := m["nell_export_proposte"]; ok {
+			v.Export = l.decisione(x, pe+".nell_export_proposte")
 		}
 		for _, k := range invariantiBooleani {
 			if x, ok := m[k]; ok {
-				if b := l.booleanoDi(x, pe+"."+k); b != nil {
+				if b := l.booleanoDi(x, dove(k)); b != nil {
 					v.Invarianti = append(v.Invarianti, InvarianteAttesa{Nome: k, Valore: *b})
 				}
 			}
@@ -645,30 +765,44 @@ func (l *lettoreSezioni) voci(n *yaml.Node, p, sezione string, note []string) []
 		for _, a := range l.testiDi(m["anomalie"], pe+".anomalie") {
 			v.Riportate = append(v.Riportate, "anomalia = "+a)
 		}
+		// codice dei file dello scenario (T-B6c-04): il piano non lo fa confrontare (6.4.9, la tabella delle sezioni:
+		// collocazione, associazione, autorità, target, radici). Si riporta accanto all'esito del file, ed è fra le
+		// chiavi libere non verificate.
+		if x, ok := m["codice"]; ok {
+			if s := l.testoDi(x, pe+".codice"); s != "" {
+				v.Riportate = append(v.Riportate, "codice = "+s)
+			}
+			l.out.ChiaviLibere = append(l.out.ChiaviLibere, indiciDegliElenchi.ReplaceAllString(pe+".codice", "[]"))
+		}
 		out = append(out, v)
 	}
 	return out
 }
 
 // lettureAttese: la mappa «atteso» delle letture di un file (baseline, reali), con le chiavi della tabella dei casi
-// (traduzione.go): una chiave che la tabella non conosce è una chiave non tradotta.
-func (l *lettoreSezioni) lettureAttese(n *yaml.Node, p string) []ChiaveAttesa {
+// (traduzione.go) e i loro sinonimi delle sezioni di A1c (sinonimiDelleLetture): una chiave che la tabella non conosce
+// è una chiave non tradotta. Le chiavi della voce scritte dentro atteso (dellaVoce, T-B6c-01) non sono letture: si
+// restituiscono a parte, e le legge la voce.
+func (l *lettoreSezioni) lettureAttese(n *yaml.Node, p string, chiaviDellaVoce []string) ([]ChiaveAttesa, map[string]*yaml.Node) {
 	if senzaValore(n) {
-		return nil
+		return nil, nil
 	}
 	n = risolvi(n)
 	if n.Kind != yaml.MappingNode {
 		l.errore(p, "serve una mappa")
-		return nil
+		return nil, nil
 	}
 	var out []ChiaveAttesa
+	dellaVoce := map[string]*yaml.Node{}
 	viste := map[string]bool{}
 	for i := 0; i+1 < len(n.Content); i += 2 {
 		k := n.Content[i].Value
 		switch {
 		case viste[k]:
 			l.errore(p+"."+k, "chiave ripetuta")
-		case !ChiaveNota(k):
+		case dentro(k, chiaviDellaVoce):
+			dellaVoce[k] = n.Content[i+1]
+		case !ChiaveNota(chiaveDellaRegola(k)):
 			l.nonTradotta(p + "." + k)
 		default:
 			out = append(out, ChiaveAttesa{Chiave: k, Valore: valoreDi(n.Content[i+1])})
@@ -676,7 +810,7 @@ func (l *lettoreSezioni) lettureAttese(n *yaml.Node, p string) []ChiaveAttesa {
 		viste[k] = true
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Chiave < out[j].Chiave })
-	return out
+	return out, dellaVoce
 }
 
 // decisione: una riga di proposta o di documento attesa, campo per campo, com'è scritta.

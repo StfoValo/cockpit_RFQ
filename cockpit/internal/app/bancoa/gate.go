@@ -156,6 +156,7 @@ type esitoVoce struct {
 	AllegatoID uuid.UUID
 	Cliente    uuid.UUID
 	Atteso     string // la collocazione attesa (scenario)
+	Radici     int    // quante radici attese ha un figlio dello scenario (file_condivisi: più di una)
 	Esito      confronto.EsitoAtteso
 	Riservata  bool
 	DipendeDa  string
@@ -386,12 +387,16 @@ func calcolaGate(in ingressoGate) Gate {
 
 // conteggiOttenuti: per ogni conteggio dichiarato dallo scenario che il runner sa contare dagli esiti, il valore
 // dichiarato e quello ottenuto:
-//   - radice e figlio: i file dello scenario con quella collocazione attesa e l'esito corretto;
+//   - radice e figlio (e candidati_radice, candidati_figlio, i nomi degli attesi: T-B6c-09): i file dello scenario con
+//     quella collocazione attesa e l'esito corretto;
+//   - file_condivisi: i figli con più di una radice attesa e l'esito corretto (che per un figlio vuole le radici
+//     raggiungibili uguali a quelle attese);
 //   - fuori_scenario: i file dello scenario con l'esito fuori_richiesta;
 //   - prodotti: i prodotti dello scenario con l'esito corretto, e in InPiu quelli del motore che lo scenario non attende
 //     (non_coperto: confronto lascia i conteggi al runner).
 //
-// «file» conta le voci degli attesi, non gli esiti: lo controlla il n.5, non il gate.
+// «file» e «allegati» contano le voci degli attesi, non gli esiti: li controlla il n.5, non il gate; «hash_distinti» lo
+// conta il n.2 sulla fotografia.
 func conteggiOttenuti(s *ScenarioAtteso, voci []esitoVoce, prodotti []confronto.EsitoProdottoAtteso) []ConteggioScenario {
 	if s == nil {
 		return nil
@@ -399,20 +404,27 @@ func conteggiOttenuti(s *ScenarioAtteso, voci []esitoVoce, prodotti []confronto.
 	var out []ConteggioScenario
 	for _, c := range s.Conteggi {
 		n, inPiu := 0, 0
-		switch c.Nome {
-		case "radice", "figlio":
+		coll, perCollocazione := collocazioneDelConteggio(c.Nome)
+		switch {
+		case perCollocazione:
 			for _, v := range voci {
-				if v.Sezione == confronto.SezioneScenario && v.Atteso == c.Nome && v.Esito == confronto.EsitoCorretto {
+				if v.Sezione == confronto.SezioneScenario && v.Atteso == coll && v.Esito == confronto.EsitoCorretto {
 					n++
 				}
 			}
-		case "fuori_scenario":
+		case c.Nome == "file_condivisi":
+			for _, v := range voci {
+				if v.Sezione == confronto.SezioneScenario && v.Atteso == confronto.AttesoFiglio && v.Radici > 1 && v.Esito == confronto.EsitoCorretto {
+					n++
+				}
+			}
+		case c.Nome == "fuori_scenario":
 			for _, v := range voci {
 				if v.Sezione == confronto.SezioneScenario && v.Esito == confronto.EsitoFuoriRichiesta {
 					n++
 				}
 			}
-		case "prodotti":
+		case c.Nome == "prodotti":
 			for _, p := range prodotti {
 				switch p.Esito {
 				case confronto.EsitoCorretto:

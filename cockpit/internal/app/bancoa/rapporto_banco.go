@@ -70,11 +70,14 @@ type RapportoBanco struct {
 	CorrezioniManuali []CorrezioniCliente  `json:"correzioni_manuali,omitempty"`
 	ProfiloLimiti     *ProfiloLimiti       `json:"profilo_limiti,omitempty"`
 	Prodotti          *SezioneProdotti     `json:"prodotti,omitempty"`
-	Attesi            *SintesiAttesi       `json:"attesi,omitempty"`
-	Casi              *RapportoCasi        `json:"casi,omitempty"`
-	Gate              *Gate                `json:"gate,omitempty"`
-	Chiusura          *Chiusura            `json:"chiusura,omitempty"`
-	Scritture         string               `json:"scritture"`
+	// RigheConfermaAlbero: le righe della «Conferma l'albero» della C5, solo informazione (D-R116 I, decisa dall'utente
+	// l'08/10): fuori dalla parte obbligatoria degli invarianti della C5, con il conteggio e il motivo.
+	RigheConfermaAlbero *RigheInformative `json:"righe_conferma_albero,omitempty"`
+	Attesi              *SintesiAttesi    `json:"attesi,omitempty"`
+	Casi                *RapportoCasi     `json:"casi,omitempty"`
+	Gate                *Gate             `json:"gate,omitempty"`
+	Chiusura            *Chiusura         `json:"chiusura,omitempty"`
+	Scritture           string            `json:"scritture"`
 }
 
 // DettaglioControllo: le differenze e le parti non verificate di un controllo del banco, una per riga, con il percorso
@@ -85,12 +88,25 @@ type RapportoBanco struct {
 //
 // AmbitiDedotti: le chiavi giudicate su un ambito dedotto dalle chiavi sorelle della voce, con l'unità (le chiavi dei
 // token: T-B6-220, precisata con R-140): solo informazione, dice su quale unità la chiave è stata giudicata.
+//
+// FuoriPerimetro: le parti che una decisione dell'utente ha messo fuori dal perimetro approvato (D-R116 F, decisa
+// dall'utente l'08/10: con gli export, il n.1 senza i finiti), con il percorso; la loro riga nella tabella delle classi
+// ha la motivazione e la fonte, e la chiusura le elenca fra i fuori perimetro. Non cambiano lo stato del controllo.
 type DettaglioControllo struct {
 	Nome           string   `json:"nome"`
 	Differenze     []string `json:"differenze,omitempty"`
 	NonVerificate  []string `json:"non_verificate,omitempty"`
 	NonApplicabili []string `json:"non_applicabili,omitempty"`
 	AmbitiDedotti  []string `json:"ambiti_dedotti,omitempty"`
+	FuoriPerimetro []string `json:"fuori_perimetro,omitempty"`
+}
+
+// RigheInformative: una sezione informativa del rapporto fatta di righe degli attesi che il runner non verifica, con il
+// loro numero, il motivo e i percorsi (senza valori).
+type RigheInformative struct {
+	Righe    int      `json:"righe"`
+	Motivo   string   `json:"motivo"`
+	Percorsi []string `json:"percorsi,omitempty"`
 }
 
 // VersioniBanco: le versioni del codice del rapporto (quelle di A1a, più quelle del motore di A1c che entrano
@@ -263,7 +279,9 @@ type SintesiThread struct {
 //   - Correzioni: la misura di confronto, sommata sui thread valutati. Il denominatore è Correzioni.Valutabili, la
 //     copertura Valutabili su Decisi; i non determinabili e i fuori copertura, per motivo, sono Correzioni.Esclusi (al
 //     posto del vecchio «prima per stringa», che non c'è più: una base che non si legge non è uguale né diversa da
-//     niente). Prima e PrimaMarcatore restano separati: la scelta del titolo è aperta (D-R114).
+//     niente). Il titolo «prima» del riepilogo è base più marcatore, Prima + PrimaMarcatore, con il marcatore da un
+//     solo lato a parte (D-R114 B, decisa dall'utente l'08/10): è solo il testo; nel JSON i due conteggi restano quelli
+//     di confronto, separati.
 //   - StessaBaseAltroTarget: i decisi con una regressione verso un candidato con la stessa base su un altro target
 //     (T-B6-51), su tutti i decisi: fuori dalla misura, non una parte di Dopo (T-B6-191).
 //   - RevisioneSoloInColonna: i file con la revisione vecchia solo nella colonna rev (R-65), divisi per lo stato della
@@ -431,6 +449,15 @@ func (r RapportoBanco) Testo() string {
 		}
 		for _, x := range d.AmbitiDedotti {
 			riga("  %s, ambito dedotto: %s", d.Nome, x)
+		}
+		for _, x := range d.FuoriPerimetro {
+			riga("  %s, fuori perimetro: %s", d.Nome, x)
+		}
+	}
+	if a := r.RigheConfermaAlbero; a != nil {
+		riga("righe della «Conferma l'albero» (solo informazione, D-R116 I): %d, non verificate — %s", a.Righe, a.Motivo)
+		for _, p := range a.Percorsi {
+			riga("  riga della «Conferma l'albero», non verificata: %s", p)
 		}
 	}
 	for _, pc := range perClienteTesto(r) {
@@ -620,19 +647,20 @@ func perClienteTesto(r RapportoBanco) []string {
 
 // testoCorrezioni: la misura delle correzioni manuali di un cliente, come la definisce R114 (precisata dall'utente il
 // 07/10): un indicatore ricostruito delle correzioni necessarie, con il denominatore, la copertura e gli esclusi per
-// motivo; «prima» e «prima_marcatore» separati, perché il titolo della misura è ancora da scegliere (D-R114); «dopo»
-// nelle sue tre parti. Nessuna misura di tempo.
+// motivo; il titolo «prima» è base più marcatore (D-R114 B, decisa dall'utente l'08/10): Prima + PrimaMarcatore, con le
+// due parti accanto, e il marcatore da un solo lato a parte, fuori dal titolo; «dopo» nelle sue tre parti. Nessuna
+// misura di tempo.
 func testoCorrezioni(c CorrezioniCliente) string {
 	x, e, r := c.Correzioni, c.Correzioni.Esclusi, c.RevisioneSoloInColonna
 	return fmt.Sprintf("correzioni manuali, cliente %s (indicatore ricostruito delle correzioni necessarie): decisi %d, denominatore %d valutabili (copertura %d su %d); "+
 		"esclusi per motivo: solo_origine_manuale %d, senza_lettura_vecchia %d, codice_non_leggibile %d, documento_senza_componente %d, nuovo_non_valutato %d; "+
-		"prima %d (cambi di base), prima_marcatore %d (non sommato a prima: D-R114 aperta), marcatore solo da un lato %d; "+
+		"prima %d (base e marcatore, D-R114 B: cambi di base %d, marcatori diversi %d), a parte marcatore solo da un lato %d; "+
 		"dopo %d (false associazioni %d, ambiguità %d, astensioni %d); solo revisione %d; "+
 		"fuori dalla misura: stessa base su un altro target %d, revisione solo in colonna %d (letta %d, nessuna regola %d, non interpretabile %d, ambigua %d, stato non nel record %d); "+
 		"a parte %d thread non valutati (decisi %d)",
 		c.ClienteID, x.Decisi, x.Valutabili, x.Valutabili, x.Decisi,
 		e.SoloOrigineManuale, e.SenzaLetturaVecchia, e.CodiceNonLeggibile, e.DocumentoSenzaComponente, e.NuovoNonValutato,
-		x.Prima, x.PrimaMarcatore, x.MarcatoreSoloDaUnLato,
+		x.Prima+x.PrimaMarcatore, x.Prima, x.PrimaMarcatore, x.MarcatoreSoloDaUnLato,
 		x.Dopo, x.FalseAssociazioni, x.Ambiguita, x.Astensioni, x.SoloRevisione,
 		c.StessaBaseAltroTarget, c.RevisioneSoloInColonna.totale(), r.Letta, r.NessunaRegola, r.NonInterpretabile, r.Ambigua, r.StatoNonNelRecord,
 		c.ThreadNonValutati, c.CorrezioniNonValutati.Decisi)

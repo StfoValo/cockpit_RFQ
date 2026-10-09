@@ -292,12 +292,13 @@ func (b *banco) controllo(nome, stato string, differenze int, motivo string) {
 	b.r.Controlli = append(b.r.Controlli, Controllo{Nome: nome, Stato: stato, Differenze: differenze, Motivo: motivo})
 }
 
-// esito: un controllo del banco nel rapporto, con il dettaglio delle differenze e delle parti non verificate.
+// esito: un controllo del banco nel rapporto, con il dettaglio delle differenze, delle parti non verificate, di quelle
+// non applicabili e di quelle fuori perimetro (D-R116 F).
 func (b *banco) esito(e esitoControllo) {
 	b.r.Controlli = append(b.r.Controlli, e.controllo())
-	if len(e.differenze) > 0 || len(e.nonFatti) > 0 || len(e.nonApplicabili) > 0 || len(e.ambitiDedotti) > 0 {
+	if len(e.differenze) > 0 || len(e.nonFatti) > 0 || len(e.nonApplicabili) > 0 || len(e.ambitiDedotti) > 0 || len(e.fuoriPerimetro) > 0 {
 		b.r.Dettagli = append(b.r.Dettagli, DettaglioControllo{Nome: e.nome, Differenze: e.differenze, NonVerificate: e.nonFatti,
-			NonApplicabili: e.nonApplicabili, AmbitiDedotti: e.ambitiDedotti})
+			NonApplicabili: e.nonApplicabili, AmbitiDedotti: e.ambitiDedotti, FuoriPerimetro: e.fuoriPerimetro})
 	}
 }
 
@@ -690,7 +691,8 @@ func (b *banco) valuta() {
 			eb = controllaBaseline(*tr, f, ix, nuovi, revisioni, cc)
 			b.esito(controlloBaselineDi(eb, true))
 			b.esito(controlloInvariantiC5(b.sezioni, *tr, f, ix, cc, badge))
-			b.esito(controlloLetture(b.sezioni, *tr, file, &esito, b.ins, cc))
+			b.r.RigheConfermaAlbero = righeConfermaAlbero(b.sezioni) // D-R116 I: solo informazione
+			b.esito(controlloLetture(b.sezioni, *tr, file, &esito, b.ins, cc, revisioni))
 			b.r.Attesi = sintesiAttesi(*b.sezioni, eb)
 			in.VociNonRisolte, in.BaselineNonRisolte = vociNonRisolte(*tr)
 			in.Scenario = b.sezioni.Scenario
@@ -973,7 +975,7 @@ func esitiDelleVoci(et valut.EsitoThread, ce confronto.Esito, tr traduzione, tb 
 				coda[k] = q[1:]
 				ec.Percorso, ec.ID, ec.Riportate, ec.NonVerificabile = vt.voce.Percorso, vt.voce.ID, vt.voce.Riportate, nonVerificabile
 				out = append(out, esitoVoce{Percorso: vt.voce.Percorso, Sezione: e.Sezione, AllegatoID: e.AllegatoID,
-					Cliente: et.ClienteID, Atteso: vt.voce.Atteso, Esito: e.Esito,
+					Cliente: et.ClienteID, Atteso: vt.voce.Atteso, Radici: len(vt.voce.Radici), Esito: e.Esito,
 					Riservata: vt.file.Riservato != "" || vt.file.StatoAtteso == confronto.StatoAttesoRiservato,
 					DipendeDa: vt.file.DipendeDa, NonVerificabile: nonVerificabile})
 			}
