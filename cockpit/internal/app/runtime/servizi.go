@@ -20,6 +20,7 @@ import (
 	"promatec/cockpit/internal/platform/db"
 	"promatec/cockpit/internal/platform/storage/nas"
 	"promatec/cockpit/internal/platform/storage/staging"
+	"promatec/cockpit/internal/transport/web"
 )
 
 // Servizi sono i pezzi di lungo periodo del processo, gia' costruiti e collegati fra loro.
@@ -47,6 +48,9 @@ type Servizi struct {
 	OpzioniSync    coda.SyncOpzioni
 	IntervalloSync time.Duration
 	SyncApertura   bool
+
+	// MotoreA: la Distinta nuova del motore A, preparata all'avvio da [motore_a] (giro 5, A1d; piano 7.4.5).
+	MotoreA web.AnteprimaMotoreA
 }
 
 // CostruisciServizi mette insieme i pezzi: lo scrittore del NAS, lo scheduler, la cache dei
@@ -115,6 +119,9 @@ func CostruisciServizi(ctx context.Context, cfg *config.Config, pool *pgxpool.Po
 	if servizioAgente.Attivo && servizioAgente.Modello != nil {
 		log.Info("analisi semantica attiva", "modello", servizioAgente.Modello.Nome(), "caselle", len(servizioAgente.Caselle))
 	}
+	// L'anteprima del motore A (giro 5, A1d): spenta non apre file; accesa legge l'indice delle regole una volta, qui,
+	// e un indice rotto non ferma l'avvio (lo dice il log, e la pagina mostra l'errore).
+	motoreA := preparaMotoreA(cfg.MotoreA, log)
 	esecutore := &EsecutoreServer{Pool: pool, NAS: scrittore, Log: log, Agente: servizioAgente}
 	ricognitore := &documenti.Ricognitore{Pool: pool, NAS: scrittore, Log: log, Ogni: cfg.IntervalloIntegrita()}
 	// D30: lo staging automatico si accende dal file di configurazione ([staging] automatico = true) e
@@ -127,7 +134,7 @@ func CostruisciServizi(ctx context.Context, cfg *config.Config, pool *pgxpool.Po
 	return &Servizi{Pool: pool, Scrittore: scrittore, Ingest: servizioIngest, Agente: servizioAgente,
 		Esecutore: esecutore, Ricognitore: ricognitore,
 		RadiceStaging: radiceStaging, OpzioniSync: opzioniSync, IntervalloSync: intervalloSync,
-		SyncApertura: syncApertura}, nil
+		SyncApertura: syncApertura, MotoreA: motoreA}, nil
 }
 
 // Avvia fa partire i due che aspettavano il server dei worker: l'esecutore dei job del server e il

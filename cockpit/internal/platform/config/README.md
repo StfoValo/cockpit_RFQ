@@ -32,7 +32,7 @@ markmap:
 ## File
 
 - **`config.go`** — Responsabilità:
-  - i tipi `Config`, `Server`, `DB`, `NAS`, `Outlook`, `Sicurezza`, `Retention`, `Analisi`, `Staging`, `Agente`, `Utente`, `Casella`, `Postazione`, `Worker`, `Rete`;
+  - i tipi `Config`, `Server`, `DB`, `NAS`, `Outlook`, `Sicurezza`, `Retention`, `Analisi`, `Staging`, `Agente`, `MotoreA`, `Utente`, `Casella`, `Postazione`, `Worker`, `Rete`;
   - `Carica` / `CaricaConRete`;
   - le `normalizza*` e `leggiRete`;
   - i percorsi (`cartellaDelFile`, `assoluto`, `conDisco`);
@@ -76,7 +76,7 @@ markmap:
 
 #### I percorsi relativi
 
-- I percorsi relativi di `[nas].radice`, `[nas].staging`, `[server].log_file`, `tls_cert` e `tls_key` (anche quelli di `-tls-cert` e `-tls-key`) si leggono dalla cartella del file di configurazione, resa assoluta (`cartellaDelFile`), non dalla cartella da cui parte il processo.
+- I percorsi relativi di `[nas].radice`, `[nas].staging`, `[server].log_file`, `tls_cert`, `tls_key` (anche quelli di `-tls-cert` e `-tls-key`) e `[motore_a].regole` si leggono dalla cartella del file di configurazione, resa assoluta (`cartellaDelFile`), non dalla cartella da cui parte il processo.
 - Restano come sono (`assoluto`):
   - il valore vuoto,
   - un percorso assoluto,
@@ -201,6 +201,12 @@ markmap:
 
 - `attivo` (`false`), `modello`, `url`, `chiave_env` (il NOME della variabile), `caselle`.
 
+#### `[motore_a]`
+
+- `anteprima` (`false`), `regole` (vuota; relativa = dalla cartella del file).
+- `anteprima = true` senza `regole` ferma l'avvio (`normalizzaMotoreA`, l'unico controllo, che non apre file).
+- L'indice, le grammatiche e il file dei casi li legge l'avvio del server (`app/runtime/motore_a.go`), che con un indice rotto parte lo stesso (giro 5, A1d).
+
 #### Le tabelle ripetute
 
 - **`[[utenti]]`**
@@ -240,7 +246,7 @@ markmap:
    - ogni chiave presente sovrascrive il default;
    - `vociSenzaEffetto` riempie `Config.Avvisi` (chiavi sconosciute, `segreto_sessione`, `[outlook].consenti_invio`);
 3. `dsn` vuota → errore;
-4. `[nas].radice`, `[nas].staging` e `[server].log_file` (tranne `-`) resi assoluti rispetto alla cartella del file (`assoluto`);
+4. `[nas].radice`, `[nas].staging`, `[server].log_file` (tranne `-`) e `[motore_a].regole` resi assoluti rispetto alla cartella del file (`assoluto`);
 5. `Rete.applica`:
    - con `-ascolto` la rete della riga di comando sostituisce **per intero** indirizzo, certificato, `tls_nomi` (azzerati), `url_pubblico`, `reti_consentite` e `consenti_lan_in_chiaro` (forzato a falso), e segna `DaRigaDiComando`;
    - senza `-ascolto` gli altri flag di rete sono un errore;
@@ -253,7 +259,8 @@ markmap:
 7. `max_upload_mb ≥ 1`;
 8. `normalizzaModalita`: vedi sotto;
 9. staging di default (`<cartella del file>/staging`) e sua creazione;
-10. `normalizzaOutlook`, `normalizzaUtenti`, `normalizzaFondazioni` (forma canonica e riferimenti incrociati; `casella_default` dedotta con una casella sola).
+10. `normalizzaOutlook`, `normalizzaUtenti`, `normalizzaFondazioni` (forma canonica e riferimenti incrociati; `casella_default` dedotta con una casella sola);
+11. `normalizzaMotoreA`: `[motore_a].anteprima = true` senza `regole` ferma l'avvio; nessun file aperto.
 
 ### Le capacità (`Capacita`)
 
@@ -292,6 +299,7 @@ markmap:
 - La rete della riga di comando passa dalle stesse verifiche del file.
 - Un percorso relativo del file vale dalla cartella del file, qualunque sia la cartella corrente del processo (un'attività pianificata o un servizio partono da un'altra cartella).
 - Una voce sconosciuta o senza effetto non ferma l'avvio e non passa in silenzio: è un avviso.
+- La sezione `[motore_a]` non apre file al caricamento.
 
 ## Dipendenze
 
@@ -317,6 +325,12 @@ markmap:
       - radice fuori dalle radici di produzione
   - **`finestra_test.go`** — Che cosa prova: `giorni_sync_iniziale` (assente, scritta, negativa) e `dal` (malformata, fuso locale)
   - **`modalita_test.go`** — Che cosa prova: assente = shadow, valore sbagliato rifiutato, shadow su radice di produzione, produzione su radice di produzione
+  - **`motore_a_test.go`** — Che cosa prova:
+    - sezione assente = spenta;
+    - accesa senza `regole` = errore d'avvio;
+    - `regole` relativa letta dalla cartella del file, assoluta, UNC e con il disco invariate;
+    - spenta con `regole` che non c'è = nessun errore;
+    - le due voci sono conosciute (nessun avviso), un refuso nella sezione è un avviso
   - **`percorsi_test.go`** — Che cosa prova:
     - `radice`, `staging` e `log_file` relativi letti dalla cartella del file anche da un'altra cartella corrente (e con `-config` relativo);
     - assoluti, UNC, «dalla radice» e con disco invariati;
@@ -357,7 +371,7 @@ markmap:
   - poi i due `*.example` (`esempio_test.go` controlla che l'esempio del server non dia avvisi)
 - **Voglio… rendere «senza effetto» una chiave che c'era** — Apro: lasciarla nel tipo e aggiungere l'avviso in `vociSenzaEffetto` (toglierla dal tipo la farebbe diventare «sconosciuta»)
 - **Voglio… capire perché una riga del file non conta** — Apro: le righe «cockpit.toml» del log di avvio (`Config.Avvisi`)
-- **Voglio… cambiare che cosa ferma l'avvio** — Apro: `normalizzaRete`, `normalizzaModalita`, `normalizzaUtenti`, `normalizzaFondazioni`, `normalizzaOutlook`
+- **Voglio… cambiare che cosa ferma l'avvio** — Apro: `normalizzaRete`, `normalizzaModalita`, `normalizzaUtenti`, `normalizzaFondazioni`, `normalizzaOutlook`, `normalizzaMotoreA`
 - **Voglio… capire perché una capacità è spenta** — Apro: `Capacita()` e i suoi `Avvisi` nel log di avvio
 - **Voglio… ammettere un altro tipo di rete** — Apro: `blocchiLAN` e `leggiRete`
 - **Voglio… un flag di rete nuovo** — Apro: `Rete`, `Rete.applica`, `cmd/cockpit/main.go`

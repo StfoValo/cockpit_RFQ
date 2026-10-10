@@ -111,6 +111,11 @@ type Server struct {
 	// stesse del workerapi. Servono alla rianalisi degli STEP di una RFQ (B8.5): si rileggono quelli
 	// che hanno i fatti con questa chiave, si accodano gli altri. Versione 0 = nessuna rianalisi.
 	Analizzatore coda.Analizzatore
+	// MotoreA è la Distinta nuova del motore A (giro 5, A1d; contratto A1d §2.1; piano 7.4.2). Spenta (il valore zero):
+	// le sue rotte rispondono 404 a tutti prima della sessione e il ramo di threadFrammento non scatta. Accesa: la vede
+	// solo l'admin. Si legge a ogni richiesta e mai al montaggio delle rotte, perché le prove la cambiano a server
+	// acceso, come Analizzatore.
+	MotoreA AnteprimaMotoreA
 }
 
 type chiaveCtx int

@@ -90,7 +90,7 @@ func Ascolta(ctx context.Context, cfg *config.Config, s *Servizi, materiale *ret
 	ws := &web.Server{Pool: s.Pool, Log: log, NAS: s.Scrittore, Ingest: s.Ingest, Templ: templ, Static: static,
 		IntervalloSync: s.IntervalloSync, Sync: s.OpzioniSync, SyncAperturaInbox: s.SyncApertura, Modalita: cfg.Server.Modalita,
 		TLS: materiale, Indirizzo: cfg.Server.Indirizzo, URLPubblico: cfg.Server.URLPubblico, Workers: risorse.FS, Agente: s.Agente,
-		Ricognitore: s.Ricognitore, Staging: s.RadiceStaging,
+		Ricognitore: s.Ricognitore, Staging: s.RadiceStaging, MotoreA: s.MotoreA,
 		Analizzatore: coda.Analizzatore{Versione: cfg.Analisi.Versione, Parametri: cfg.Analisi.Parametri}}
 	if err := ws.Init(); err != nil {
 		return err

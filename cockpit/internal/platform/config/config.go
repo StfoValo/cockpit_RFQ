@@ -30,6 +30,7 @@ type Config struct {
 	Staging    Staging      `toml:"staging"`    // [staging] — checkpoint 3R, D30
 	Agente     Agente       `toml:"agente"`     // [agente] — checkpoint 3R §9
 	Sicurezza  Sicurezza    `toml:"sicurezza"`  // [sicurezza] — checkpoint 3R, blocco 4
+	MotoreA    MotoreA      `toml:"motore_a"`   // [motore_a] — giro 5, A1d: la Distinta nuova, solo admin
 
 	// Avvisi sono le cose del file che non fermano l'avvio ma vanno dette nel log: le voci che non
 	// esistono (un refuso, che altrimenti vale come se la riga non ci fosse) e quelle che si leggono ma
@@ -130,6 +131,16 @@ func (c *Config) Capacita() Capacita {
 
 // vuole risolve un puntatore assente in «no».
 func vuole(b *bool) bool { return b != nil && *b }
+
+// MotoreA è [motore_a] (giro 5, A1d; piano 7.4.1, 7.6.1; contratto A1d §2.1, §5): la Distinta nuova del motore A, la
+// pagina /thread/<id>/motore-a. Due voci sole (R43 B): il flag e l'indice delle regole. Spenta se la sezione manca o se
+// anteprima = false: l'avvio non legge nessun file e la pagina risponde 404 a tutti. Accesa, la vede solo il ruolo
+// admin (R11). Le soglie del motore non sono voci di questa sezione: le dichiara l'indice (versione dei limiti e valori,
+// compreso il tempo massimo di un calcolo della pagina), e il codice tiene solo i tetti.
+type MotoreA struct {
+	Anteprima bool   `toml:"anteprima"` // assente = false
+	Regole    string `toml:"regole"`    // l'indice di grammatiche, casi e limiti; relativo alla cartella di questo file
+}
 
 // Agente: l'analisi semantica dei messaggi (checkpoint 3R §9).
 //
@@ -563,6 +574,7 @@ func CaricaConRete(percorso string, rete Rete) (*Config, error) {
 	if c.Server.LogFile != "-" {
 		c.Server.LogFile = assoluto(dir, c.Server.LogFile)
 	}
+	c.MotoreA.Regole = assoluto(dir, c.MotoreA.Regole)
 	if err := rete.applica(&c.Server); err != nil {
 		return nil, err
 	}
@@ -590,7 +602,21 @@ func CaricaConRete(percorso string, rete Rete) (*Config, error) {
 	if err := c.normalizzaFondazioni(); err != nil {
 		return nil, err
 	}
+	if err := c.normalizzaMotoreA(); err != nil {
+		return nil, err
+	}
 	return c, nil
+}
+
+// normalizzaMotoreA ferma l'avvio in un solo caso (piano 7.4.1): l'anteprima accesa senza indice, un errore che si vede
+// senza aprire file. L'indice, le grammatiche e il file dei casi li legge l'avvio del server (app/runtime/motore_a.go),
+// che con un indice rotto parte lo stesso: la pagina dice l'errore, il log il motivo.
+func (c *Config) normalizzaMotoreA() error {
+	if c.MotoreA.Anteprima && c.MotoreA.Regole == "" {
+		return fmt.Errorf("config: [motore_a].anteprima = true senza [motore_a].regole: serve l'indice delle regole " +
+			"del motore A, con un percorso assoluto o relativo alla cartella di questo file")
+	}
+	return nil
 }
 
 // normalizzaUtenti valida [[utenti]] (voce 6.9). Un ruolo che non esiste ferma l'avvio.

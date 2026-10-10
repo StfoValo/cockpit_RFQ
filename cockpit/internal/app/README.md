@@ -37,7 +37,7 @@ markmap:
 
 ## File
 
-- Due package: `runtime`, il processo del server, in sette file; `bancoa`, il banco del motore A (giro 5, A1a e
+- Due package: `runtime`, il processo del server, in otto file; `bancoa`, il banco del motore A (giro 5, A1a e
   A1c), che ha il suo README ([`bancoa/README.md`](bancoa/README.md)).
 - `bancoa` non è un processo di lungo periodo e non sa niente del server: legge il manifest del dataset
   privato, gli attesi (è l'unico importatore della libreria YAML), l'indice e le grammatiche, fa girare le
@@ -68,8 +68,11 @@ markmap:
     - e `ricalcola` (il ritriage delle sole chiavi appena scritte)
   - **`servizi.go`**
     - `Servizi`
-    - `CostruisciServizi` (scrittore NAS, scheduler e cache avviati subito, agente, esecutore, ricognitore, ingest, opzioni del sync)
+    - `CostruisciServizi` (scrittore NAS, scheduler e cache avviati subito, agente, esecutore, ricognitore, ingest, opzioni del sync, anteprima del motore A)
     - `Servizi.Avvia` (esecutore e ricognitore)
+  - **`motore_a.go`** (giro 5, A1d)
+    - `preparaMotoreA` (l'anteprima del motore A all'avvio: indice, grammatiche, file dei casi, limite, la riga del log)
+    - `leggiRegoleMotoreA` e `regoleLette` (il disco: i file solo dentro la cartella dell'indice)
   - **`ascolto.go`**
     - `PreparaTLS` (certificato, impronta, avvisi su chiaro e `token_worker`)
     - `Ascolta` (`web.Server`, `workerapi.Server`, il mux dietro `web.ProtezioneCSRF`, il filtro `rete.SoloDalleReti`, il listener)
@@ -179,7 +182,7 @@ markmap:
   7. `ImpostaCapacita` — `coda.ImpostaCapacita`, `coda.AllineaCoda`, una riga di log per capacità
   8. `ingest.RicalcolaControparti`
   9. **eventuale lavoro amministrativo che scrive (`-semina-anagrafica`, `-importa-fornitori`, `-migra`), e qui si esce**
-  10. `CostruisciServizi` — scheduler e cache partono qui
+  10. `CostruisciServizi` — scheduler e cache partono qui; con `[motore_a].anteprima = true` l'anteprima del motore A legge qui le sue regole (`preparaMotoreA`)
   11. `PreparaTLS`
   12. `Ascolta`
       - nascono `web.Server` e `workerapi.Server`
@@ -218,6 +221,7 @@ markmap:
     - casella o postazione non dichiarata
     - token uguale per due worker
     - più caselle senza `casella_default`
+  - `[motore_a].anteprima = true` senza `regole` (un indice del motore A rotto invece non ferma: vedi sotto)
 - **database**
   - PostgreSQL non raggiungibile o credenziali sbagliate
   - il ruolo non può creare tabelle o l'estensione `pgcrypto` (migrazione 0001)
@@ -251,6 +255,7 @@ markmap:
   - un `token_worker` rimasto nel file
   - il certificato che non nomina l'host di `url_pubblico`
   - l'agente acceso senza chiave
+  - l'indice del motore A che non si legge, è rifiutato o non attiva nessuna grammatica, e il suo file dei casi non letto (`[motore_a]` accesa: la pagina mostra l'errore, il log il motivo)
   - `[retention].giorni_staging` deprecata.
 
 ### Il job del server
@@ -286,9 +291,9 @@ markmap:
 ## Dipendenze
 
 - `runtime` importa:
-  - `core` (`inbox/ingest`, `registro/anagrafica`, `registro/fornitori`, `rfq/documenti`)
+  - `core` (`inbox/ingest`, `registro/anagrafica`, `registro/fornitori`, `rfq/documenti`; da A1d `inbox/classificazione/motorea`, `registro/regole/grammatica`, `valutazione`, per l'anteprima del motore A)
   - `ai/agente`
-  - `platform` (`coda`, `config`, `contratti/worker`, `db`, `fondazioni`, `logfile`, `migrazioni`, `rete`, `storage/nas`, `storage/staging`)
+  - `platform` (`coda`, `config`, `contratti/worker`, `db`, `fondazioni`, `jsoncanonico`, `logfile`, `migrazioni`, `rete`, `storage/nas`, `storage/staging`)
   - `transport` (`web`, `workerapi`)
   - e il package radice del modulo (`embed.go`: l'`embed.FS` con migrazioni, template, statici e file dei worker).
 - È l'unica area che può conoscerle tutte insieme.
@@ -328,6 +333,8 @@ markmap:
     - l'estrazione non dipende dal NAS
   - **`lettura_db_test.go`** — L4
     - i comandi in sola lettura non migrano un database vecchio e non scrivono
+  - **`motore_a_test.go`** — L1
+    - spenta senza file aperti, le regole ACME (`testdata/motore_a/`), indice rotto, grammatica cambiata, casi cambiati, file fuori dalla cartella
   - **`esegui_test.go`** — L1
     - `LivelloLog` (debug, info, warn, error, parola sconosciuta)
     - `SoloLettura`

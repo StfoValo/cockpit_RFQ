@@ -58,6 +58,8 @@
 #     da un file JSON esterno, `cockpit.exe -semina-anagrafica seme_anagrafica.json` (formato ed
 #     effetti nel README), e da li' in avanti si lavora da **Admin -> Anagrafica**, che e' anche
 #     l'unico posto in cui si scrivono peso, portale e regole di riconoscimento.
+# 12. Facoltativo, solo per provare il motore A (giro 5): [motore_a], in fondo. Spenta di default: senza toccarla
+#     il Cockpit si comporta come prima. Accesa, la pagina /thread/<id>/motore-a (la Distinta nuova) è dell'admin.
 #
 # Una voce scritta male (un refuso nel nome) non ferma l'avvio: il server la ignora e lo scrive nel log,
 # riga «cockpit.toml». Conviene guardarle, perché una voce ignorata vale come se non ci fosse.
@@ -439,6 +441,32 @@ modello = "claude-sonnet-5"
 chiave_env = "ANTHROPIC_API_KEY"
 # url = ""                      # vuoto = quello predefinito del fornitore
 caselle = []                    # indirizzi su cui l'analisi e' permessa; vuoto = nessuna
+
+[motore_a]
+# Giro 5, consegna A: la Distinta nuova del motore A, la pagina /thread/<id>/motore-a (A1d).
+# Aprirla NON scrive niente: legge la RFQ in una transazione in sola lettura e calcola in memoria che cosa vede il motore
+# nuovo. I suoi pulsanti sono i gesti che il Cockpit ha già (le stesse rotte del Fascicolo e della Distinta): scrivono
+# come scrivono lì, e solo quando una persona li preme.
+# La vede SOLO chi ha il ruolo admin in [[utenti]]. Non c'è una voce nella barra: l'indirizzo si scrive a mano.
+# Spenta, o senza questa sezione, la pagina non esiste: /thread/<id>/motore-a risponde 404 a tutti, anche all'admin.
+# Le regole NON vengono da Admin › Anagrafica (cliente.regole): vengono dall'indice indicato qui.
+#
+# COME SI ACCENDE, in ordine:
+#   1. copiare in una cartella del server l'indice delle regole e i file che elenca, cioè le grammatiche e il file dei
+#      casi, tutti nella stessa cartella (contengono dati dei clienti: non stanno nel repository). Un file che l'indice
+#      nomina fuori da quella cartella non si legge. L'indice dichiara anche i limiti del motore, con la loro versione,
+#      e il tempo massimo di un calcolo della pagina;
+#   2. scrivere qui `regole`, assoluto o relativo alla cartella di questo file;
+#   3. controllare chi è admin: il ruolo viene da [[utenti]] ed è riscritto a ogni avvio; un utente tolto dal file
+#      conserva nel database il ruolo che aveva;
+#   4. anteprima = true e riavviare. Il log dell'avvio dice l'indice, la sua impronta, la versione dei limiti, il file
+#      dei casi, i clienti attivi e quelli scartati. Un indice rotto, o senza limiti, non ferma il Cockpit: lo dice il
+#      log, e la pagina mostra l'errore. anteprima = true senza `regole` invece ferma l'avvio.
+# COME SI SPEGNE: anteprima = false e riavvio. Non c'è niente da ripulire.
+# CHI ARRIVA DA UN FILE SENZA QUESTA SEZIONE: non deve fare niente, la pagina resta spenta. Un cockpit.exe di prima che
+# trova questa sezione parte lo stesso, e la segnala nel log come voce sconosciuta.
+anteprima = false
+# regole = 'C:\Cockpit\motore_a\indice_motore_a.json'
 
 # ---------------------------------------------------------------------------
 # UTENTI (voce 6.9): chi entra e che cosa può fare.
