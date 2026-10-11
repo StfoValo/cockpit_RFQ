@@ -7,9 +7,10 @@ package web
 // prima della sessione; acceso = solo l'admin), il calcolo in sola lettura con il limite dell'indice e un recover
 // (caricatore.Carica → valutazione.Calcola → la copia di passaggio → confronto.Confronta), la fase registrata e
 // l'esistenza della RFQ in una transazione READ ONLY sua, e il ramo dell'esito dei gesti che threadFrammento richiama
-// (contratto §3.1; v1.1 §4.10). La pagina HTML (motoreAPagina, rendiMotoreA, la voce di Init) arriva in A1d-P3 con il
-// suo template. Le ricerche per il template stanno in motore_a_indice.go, le etichette in motore_a_etichette.go, la
-// copia di passaggio in motore_a_passaggio.go, l'anteprima JSON dello STEP in motore_a_anteprima.go.
+// (contratto §3.1; v1.1 §4.10). A1d-P3: la pagina HTML (motoreAPagina, rendiMotoreA; il template motore_a.html, che
+// Init carica con le altre pagine, T-A1d-06). Le ricerche per il template stanno in motore_a_indice.go, le etichette in
+// motore_a_etichette.go, la copia di passaggio in motore_a_passaggio.go, l'anteprima JSON dello STEP in
+// motore_a_anteprima.go.
 //
 // Una GET di motore-a non scrive niente: nessun job, nessun prepara, nessuna sincronizzazione. Le sole letture del DB
 // sono quelle del caricatore (REPEATABLE READ READ ONLY, caricatore.go:109), GetThread, GetFaseCorrente e
@@ -152,16 +153,18 @@ func prodottoScelto(e *valutazione.EsitoThread, rif string) string {
 // ---------------------------------------------------------------- rotte e porta
 
 // registraMotoreA monta le rotte della Distinta nuova (contratto §2.1, §3.4 A). Prima il flag, poi soloAdmin: la
-// protezione sta nel punto di montaggio (piano 7.4.3).
+// protezione sta nel punto di montaggio (piano 7.4.3). La pagina (A1d-P3, piano A1d backend §8 n.2) ha la stessa porta
+// del JSON e dell'anteprima.
 func (s *Server) registraMotoreA(mux *http.ServeMux) {
+	mux.HandleFunc("GET /thread/{id}/motore-a", s.conMotoreA(s.soloAdmin(s.motoreAPagina)))
 	mux.HandleFunc("GET /thread/{id}/motore-a/dati", s.conMotoreA(s.soloAdmin(s.motoreADati)))
 	mux.HandleFunc("GET /thread/{id}/motore-a/anteprima/step-strutturale", s.conMotoreA(s.soloAdmin(s.motoreAAnteprimaStep)))
-	// A1d-P3: mux.HandleFunc("GET /thread/{id}/motore-a", s.conMotoreA(s.soloAdmin(s.motoreAPagina)))
 
 	// Gli altri metodi sugli stessi indirizzi (S-01 della revisione di A1d-P2; contratto §2.1 «a flag spento 404 a
 	// tutti»): senza questi schemi il mux risponderebbe 405 con Allow prima della porta, e a flag spento la rotta si
 	// distinguerebbe da un indirizzo che non esiste. Lo schema con il metodo è più specifico: GET e HEAD restano alle
-	// righe qui sopra. In A1d-P3 la pagina ha la sua riga gemella, «/thread/{id}/motore-a».
+	// righe qui sopra. Una riga gemella per ognuna delle tre, la pagina compresa (D-A1d-P2C-05).
+	mux.HandleFunc("/thread/{id}/motore-a", s.conMotoreA(metodoNonAmmessoMotoreA))
 	mux.HandleFunc("/thread/{id}/motore-a/dati", s.conMotoreA(metodoNonAmmessoMotoreA))
 	mux.HandleFunc("/thread/{id}/motore-a/anteprima/step-strutturale", s.conMotoreA(metodoNonAmmessoMotoreA))
 }
@@ -447,6 +450,64 @@ func faseMotoreADa(ctx context.Context, p iniziatoreMA, thread uuid.UUID) (*fase
 	}
 	return &faseRegistrata{Nome: string(v.NomeFase), Etichetta: descrizione, Inizio: v.Inizio, GgInFase: v.GgInFase,
 		Semaforo: v.Semaforo, Terminale: v.Terminale}, nil
+}
+
+// ---------------------------------------------------------------- la pagina (A1d-P3)
+
+// motoreAPagina: GET /thread/{id}/motore-a. La pagina intera (layout + contenuto) o, con htmx, il frammento
+// motore_a_corpo (contratto §2.1, §3.3; piano A1d backend §8 n.3). Cache-Control: no-store; HEAD: solo le intestazioni,
+// nessun calcolo e nessuna lettura (T-A1d-13, come /dati). Una RFQ che non c'è è un 404 (P-12); ogni altro problema è
+// la pagina con Errore (paginaMotoreADa). Non scrive niente: nessun job, nessun prepara (DB7-6), nessuna
+// sincronizzazione; le letture sono quelle di paginaMotoreADa.
+func (s *Server) motoreAPagina(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	thread, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		http.Error(w, "id non valido", 400)
+		return
+	}
+	if r.Method == http.MethodHead {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		return
+	}
+	p, ok := s.paginaMotoreADa(r.Context(), r, thread)
+	if !ok {
+		http.Error(w, "RFQ non trovata", 404)
+		return
+	}
+	s.rendiMotoreA(w, r, p)
+}
+
+// rendiMotoreA è rendi (server.go) in un buffer (T-A1d-05): la pagina intera («layout») o, con HX-Request senza
+// HX-History-Restore-Request (frammentoRichiesto), «motore_a_corpo». La vista è quella di rendi: Utente e Admin
+// sempre, Stato solo per la pagina con un utente (nessuna lettura del DB senza utente nel contesto); il titolo è
+// «Distinta» (contratto §2.2). Un errore di template, anche il panic di una ricerca dell'indice (text/template lo
+// recupera e lo restituisce come errore), è un 500 testuale, mai una pagina a metà: le intestazioni e i byte si
+// scrivono solo dopo l'esecuzione riuscita.
+func (s *Server) rendiMotoreA(w http.ResponseWriter, r *http.Request, p *paginaMotoreA) {
+	t := s.pagine["motore_a.html"]
+	if t == nil {
+		http.Error(w, "pagina non disponibile", 500)
+		return
+	}
+	v := vista{Utente: utenteDa(r.Context()), Titolo: "Distinta", Dati: p, Frammento: frammentoRichiesto(r)}
+	v.Admin = almeno(v.Utente, db.RuoloUtenteAdmin)
+	if !v.Frammento && v.Utente != nil {
+		v.Stato = s.stato(r.Context(), sessioneDa(r.Context()))
+	}
+	nome := "layout"
+	if v.Frammento {
+		nome = "motore_a_corpo"
+	}
+	var buf bytes.Buffer
+	if err := t.ExecuteTemplate(&buf, nome, v); err != nil {
+		s.Log.Error("template", "pagina", "motore_a.html", "err", err)
+		http.Error(w, "errore nel disegnare la pagina", 500)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(buf.Bytes())
 }
 
 // ---------------------------------------------------------------- i gestori di P2

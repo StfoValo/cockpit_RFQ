@@ -1,0 +1,1478 @@
+{{/*
+  Motore A, A1d (giro 5): la Distinta nuova, /thread/{id}/motore-a, solo per l'admin, dietro [motore_a].anteprima.
+  Contratto A1d v1 §1 (dati), §2 (lettura), §3 (gesti), §5 (pagina), §6 (fuori); v1.1 = ELENCO §4; piano del frontend
+  (PIANO_A1D_FRONTEND §2-§7) e raccordo (RACCORDO_A1D, RAC-nn). Aspetto: quello di prima (cartiglio, schede dei
+  prodotti, analisi del prodotto, albero a caselle come un organigramma, colonna del pezzo scelto), in UN workspace.
+
+  Regole di questo file:
+  - mostra soltanto: stati, assi, motivi, tipi, quantità, fabbisogni e chiavi dei gruppi arrivano dal server (l'esito,
+    il confronto e le 25 ricerche di .Dati.Indice). Qui si sceglie solo COME mostrarli: una classe di tono per un valore
+    di enum, un testo da `etichetta`, l'ordine delle righe. Mai un dato nuovo, mai una prontezza, mai una scelta fatta
+    al posto di chi guarda (nessuna struttura candidata preselezionata, nessun radio spuntato, nessuna `qta` scritta);
+  - vista=distinta e vista=documenti rendono lo STESSO ma_workspace (FE-13, ELENCO §4.1): cambiano solo data-ma-vista,
+    la voce corrente di #ma-viste, gli indirizzi con vista= e la classe ma-evidenza di #ma-documenti; vista=rfq è il
+    riepilogo (R10), senza workspace;
+  - le chiavi dei gruppi (bom, cand:<allegato>:<radice>, senza) le dà Indice.Gruppi: qui non si compongono e non si
+    spezzano (X-02, T-A1d-FE-01); la chiave di una casella è «<gruppo>|<rif>» (difetto 2, D6);
+  - ogni valore di enum passa da {{etichetta "<dominio>" valore}}; il codice grezzo resta nel title per l'admin.
+    Domini usati (62 della tabella del backend, RAC-11): stato_prodotto, motivo_prodotto, stato_fonte, motivo_fonte,
+    stato_verifica_asse, stato_smistamento, motivo_smistamento, stato_documenti, esito_fabbisogno, motivo_fabbisogno,
+    disponibilita, stato_struttura, tipo_componente, origine_tipo, categoria, origine_dato, stato_nas, badge,
+    motivo_non_congelabile, motivo_thread, tipo_conflitto, perimetro, stato_identita_target, autorita, motivo_asse,
+    motivo_documenti, motivo_perimetro, compatibilita, motivo_grafo, estrazione, validita_2d, tipo_documento,
+    stato_riga, motivo_file, asse_conflitto, motivo_conflitto, motivo_previsto, ruolo, regola_primario,
+    relazione_disegni, stato_revisione, motivo_non_congelato, esito_riconciliazione, origine_candidato,
+    motivo_lettura, motivo_proposto, rev_provenienza, fonte_revisione, motivo_documentale, motivo_abbinamento,
+    motivo_classificazione, cartiglio, discordanza, esito_vista, nota_regola, stato_versione, stato_thread, semaforo,
+    fase, associazione, collocazione, origine_categoria;
+  - i gesti: data-ma-gesto (POST) letto dal ponte motore_a_gesti.mjs, l'unico che scrive; quelli con un'anteprima o una
+    firma (STEP strutturale, tipo, «Conferma l'albero») li apre motore_a.mjs con data-ma-azione e li manda il ponte.
+    Le rotte sono SOLO quelle della lista chiusa (piano del backend §5.7.2); htmx solo per le letture (hx-get delle
+    viste e dei prodotti), mai per scrivere o per partire da solo;
+  - .Dati.Scrive falso: ogni gesto è spento (disabled sul pulsante o <fieldset disabled>), niente trascinamento;
+  - gli ID vengono solo dai campi del contratto §1.9 e dalle ricerche dell'indice, mai da un Rif spezzato;
+  - un uuid.UUID è sempre vero: i facoltativi sono *uuid.UUID e si leggono con `with` (RAC-07);
+  - tre conferme distinte, in tre posti: della fonte (R3, #ma-fonte), dell'albero (R4, #ma-albero), documentale
+    (R8 e R9); fase registrata (R1), stato del thread (R1) e stato del prodotto (R2) in tre celle diverse;
+  - ciò che la v1 non fa resta visibile e spento, con «non ancora disponibile» e il motivo, in un posto solo.
+
+  I sotto-template prendono (arr $v $p …): $v = la vista (.), $p = il prodotto scelto (*valutazione.ProdottoValutato),
+  $g = un gruppoMA di Indice.Gruppi, $n = un *valutazione.NodoBOM, $vo = una valutazione.VoceFabbisogno,
+  $f = una valutazione.FileDaSmistare.
+*/}}
+{{define "contenuto"}}<div id="ma-avviso" role="status" aria-live="polite"></div>
+<div id="ma" data-ma-pdfjs="{{statico "pdfjs-6.3.289/pdf.min.mjs"}}" data-ma-pdfjs-worker="{{statico "pdfjs-6.3.289/pdf.worker.min.mjs"}}">{{template "motore_a_corpo" .}}</div>
+<link rel="stylesheet" href="{{statico "motore_a.css"}}">
+{{/* P-10, RAC-17 (piano del backend §5.7.4): l'impronta del ponte. motore_a.mjs importa "./motore_a_gesti.mjs", che
+   si risolve in /static/motore_a_gesti.mjs: la mappa lo porta all'indirizzo con ?v=. Prima del modulo, perché una
+   mappa che arriva dopo il primo modulo il browser la ignora. È l'unico /static/ scritto qui (RAC-18): ogni altro
+   statico passa da {{statico}}. Il ponte NON si carica con un altro <script>: due copie farebbero partire ogni gesto
+   due volte. Per html/template il contenuto di type="importmap" è testo HTML, non JSON: {{statico}} passa
+   dall'escape dell'HTML, che il browser dentro <script> non decodifica. Va bene solo perché statico dà un indirizzo
+   fisso (/static/<nome>?v=<esadecimale>, senza & < " +): qui non entra mai un dato (revisione P3, B-3 e N-01). */}}
+<script type="importmap">{"imports":{"/static/motore_a_gesti.mjs":"{{statico "motore_a_gesti.mjs"}}"}}</script>
+<script type="module" src="{{statico "motore_a.mjs"}}"></script>
+{{end}}
+
+{{/* La radice del frammento: un solo elemento di primo livello, la .ma (RAC-23); htmx la rimette dentro #ma. */}}
+{{define "motore_a_corpo"}}{{$d := .Dati}}{{$vista := or $d.Vista "distinta" -}}
+<div class="ma" data-ma-thread="{{$d.ThreadID}}" data-ma-prodotto="{{$d.Prodotto}}" data-ma-vista="{{$vista}}">
+{{if and $d.Esito $d.Indice}}{{with $d.Indice.Prodotto $d.Prodotto}}{{$p := .}}
+  <header class="ma-testa" id="ma-testa">{{template "ma_testa" (arr $ $p)}}{{template "ma_strisce" (arr $)}}</header>
+  <div class="ma-navi">
+    {{template "ma_viste" (arr $ $p)}}
+    {{if ne $vista "rfq"}}{{template "ma_ptabs" (arr $ $p)}}{{end}}
+  </div>
+  {{if eq $vista "rfq"}}{{template "ma_riepilogo" (arr $ $p)}}
+  {{else}}{{template "ma_workspace" (arr $ $p)}}{{end}}
+{{else}}
+  <header class="ma-testa" id="ma-testa">{{template "ma_testa" (arr $ nil)}}{{template "ma_strisce" (arr $)}}</header>
+  <div class="ma-corpo-solo">
+    <p class="ma-vuoto">Nessun prodotto valutato in questa RFQ: la pagina non ha un prodotto da mostrare.</p>
+    {{template "ma_fascicolo" (arr $ nil)}}
+  </div>
+{{end}}{{else}}
+  {{/* RAC-05: con Errore ci sono solo ThreadID, Vista, Scrive e al più Testa.Fase. L'errore si scrive così com'è:
+     può essere il calcolo, le regole non caricate, la versione dell'esito o il tempo; nessun titolo nostro. */}}
+  <header class="ma-testa" id="ma-testa">{{template "ma_testa" (arr $ nil)}}{{template "ma_strisce" (arr $)}}
+  {{if not $d.Errore}}<div class="ma-striscia ma-striscia--ko" role="alert">{{template "ma_ic" "alert"}}<span>Il server non ha mandato l'esito né il motivo.</span></div>{{end}}
+  </header>
+{{end}}
+</div>
+{{- end}}
+
+{{/* Il workspace (U-05; piano del frontend §4.1): uguale per distinta e documenti. Al centro fonte (R3), barra
+   dell'albero (R4, SOPRA le schede), schede (R5) e conflitti della struttura (R7); a destra l'anteprima (R6) e «Da
+   smistare» (R8); in fondo, a tutta larghezza, il riepilogo documentale (R9). Le colonne le fa il CSS (container
+   query su .ma-ws: tre da 1180 px, due da 860 px, sotto una e l'anteprima come foglio dal basso). */}}
+{{define "ma_workspace"}}{{$v := index . 0}}{{$p := index . 1}}
+<div class="ma-ws" data-ma-ws><div class="ma-ws-griglia">
+  <div class="ma-ws-centro">
+    {{template "ma_analisi" (arr $v $p)}}
+    {{template "ma_barra_albero" (arr $v $p)}}
+    {{template "ma_schede_albero" (arr $v $p)}}
+    {{template "ma_conflitti" (arr $v $p "struttura")}}
+  </div>
+  <div class="ma-ws-destra">
+    {{template "ma_anteprime" (arr $v $p)}}
+    {{template "ma_da_smistare" (arr $v $p)}}
+  </div>
+  {{template "ma_documenti" (arr $v $p)}}
+</div></div>
+{{end}}
+
+{{/* ================================================================ icone (tratto 1.7, griglia 24, una famiglia) */}}
+
+{{define "ma_ic"}}<svg class="ma-ic" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+{{- if eq . "file"}}<path d="M13.5 3.8H7.2a1.4 1.4 0 0 0-1.4 1.4v13.6a1.4 1.4 0 0 0 1.4 1.4h9.6a1.4 1.4 0 0 0 1.4-1.4V8.3l-4.7-4.5z"/><path d="M13.4 3.9V8h4.6"/>
+{{- else if eq . "chev"}}<path d="m9.5 6 6 6-6 6"/>
+{{- else if eq . "check"}}<path d="m5 12.5 4.5 4.5L19 7.5"/>
+{{- else if eq . "alert"}}<path d="M12 5.2 3.6 19h16.8L12 5.2z"/><path d="M12 10v4.2M12 16.6v.4"/>
+{{- else if eq . "plus"}}<path d="M12 5.5v13M5.5 12h13"/>
+{{- else if eq . "x"}}<path d="m6.5 6.5 11 11m0-11-11 11"/>
+{{- else if eq . "grid"}}<rect x="4" y="4" width="7" height="7" rx="1.2"/><rect x="13" y="4" width="7" height="7" rx="1.2"/><rect x="4" y="13" width="7" height="7" rx="1.2"/><rect x="13" y="13" width="7" height="7" rx="1.2"/>
+{{- else if eq . "cube"}}<path d="M12 3.6 20 7.8v8.4L12 20.4 4 16.2V7.8L12 3.6z"/><path d="m4 7.8 8 4.2 8-4.2M12 12v8.4"/>
+{{- else if eq . "globe"}}<circle cx="12" cy="12" r="7.8"/><path d="M4.4 10h15.2M4.4 14h15.2"/><path d="M12 4.2c2 2.2 3 5 3 7.8s-1 5.6-3 7.8c-2-2.2-3-5-3-7.8s1-5.6 3-7.8z"/>
+{{- else if eq . "link"}}<path d="M9.5 14.5 14.5 9.5"/><path d="M11.8 7.2 13.5 5.5a3.6 3.6 0 0 1 5 5l-1.7 1.7M12.2 16.8 10.5 18.5a3.6 3.6 0 0 1-5-5l1.7-1.7"/>
+{{- else if eq . "upload"}}<path d="M12 15V4m0 0-4 4m4-4 4 4"/><path d="M4.5 15.5v3a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-3"/>
+{{- else if eq . "refresh"}}<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v3.8h-3.8"/>
+{{- else if eq . "eye"}}<path d="M3 12c1.6-4 5-7 9-7s7.4 3 9 7c-1.6 4-5 7-9 7s-7.4-3-9-7z"/><circle cx="12" cy="12" r="2.8"/>
+{{- else if eq . "folder"}}<path d="M3.5 7.2a1.7 1.7 0 0 1 1.7-1.7h4.2l2 2.2h7.4a1.7 1.7 0 0 1 1.7 1.7v8.9a1.7 1.7 0 0 1-1.7 1.7H5.2a1.7 1.7 0 0 1-1.7-1.7V7.2z"/>
+{{- else if eq . "swap"}}<path d="M5 8.5h13m0 0-3.5-3.5M18 8.5 14.5 12M19 15.5H6m0 0 3.5-3.5M6 15.5 9.5 19"/>
+{{- else if eq . "list"}}<path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.8" cy="6.5" r="1" fill="currentColor"/><circle cx="4.8" cy="12" r="1" fill="currentColor"/><circle cx="4.8" cy="17.5" r="1" fill="currentColor"/>
+{{- else if eq . "foglio"}}<rect x="2.5" y="5" width="19" height="14" rx="1"/><path d="M4.5 7h15v10h-15z" stroke-width="1"/><path d="M13 13.5h6.5M13 13.5V17M16 13.5V17" stroke-width="1"/>
+{{- end}}</svg>{{end}}
+
+{{/* ================================================================ vocabolario degli stati
+  ma_tono: un valore di enum diventa SOLO una classe (ok, prop, ver, ko, neu). Le parole le dà `etichetta`.
+  La stessa forma e lo stesso colore valgono in testa, nell'albero e nei documenti. */}}
+
+{{define "ma_tono"}}{{- if eq . "confermata" "confermato" "verificata" "verificato" "completa" "presente" "scritto" "disponibile" "valido" "pronto_fattibilita" "uguale" "equivalente" "concorda" "candidato_unico" -}}
+ok
+{{- else if eq . "in_attesa_di_conferma" "proposta" "proposto" "struttura_candidata" "da_confermare" "manuale" "nuovo_ancoraggio" "candidata" "completamento_proposto" "correzione_proposta" "proposto_dalla_riga" "proposto_dalla_regola" "compatibile_parziale" -}}
+prop
+{{- else if eq . "da_verificare" "in_revisione" "da_riesaminare" "in_coda" "pendente" "parziale" "non_pronto" "bom_di_lavoro_proposta" "mancante" "diverso" "ambiguo" "manca" "incompleta" -}}
+ver
+{{- else if eq . "assente" "conflitto" "errore" "illeggibile" "regressione_su_confermata" "discordante" -}}
+ko
+{{- else -}}
+neu
+{{- end -}}{{end}}
+
+{{/* ma_tono_d: come ma_tono, con le poche eccezioni di dominio dove lo stesso valore vuol dire un'altra cosa.
+  «assente» è un errore per la fonte (ko), ma per la revisione di un disegno vuol dire solo «nessuna rev» (neu). */}}
+{{define "ma_tono_d"}}{{$dom := index . 0}}{{$val := index . 1}}{{- if and (eq $dom "stato_revisione") (eq $val "assente") -}}
+neu
+{{- else -}}{{template "ma_tono" $val}}{{- end -}}{{end}}
+
+{{/* Un valore vuoto è «—» con il title: «dato non ancora disponibile» è riservato a ciò che il contratto §6 rinvia. */}}
+{{define "ma_st"}}{{$dom := index . 0}}{{$val := index . 1}}{{if $val}}<span class="ma-st ma-st--{{template "ma_tono_d" (arr $dom $val)}}" title="{{$dom}} = {{$val}}">{{etichetta $dom $val}}</span>{{else}}<span class="ma-st ma-st--na" title="{{$dom}}: campo vuoto">—</span>{{end}}{{end}}
+
+{{/* Un gesto che qui non c'è o è spento: il pulsante spento e il motivo, scritto accanto. */}}
+{{define "ma_na"}}<span class="ma-na"><button type="button" class="ma-btn ma-btn--sm ma-btn--na" disabled title="{{index . 1}}">{{index . 0}}</button><small>{{index . 1}}</small></span>{{end}}
+
+{{/* ================================================================ R1 testa: briciole e cartiglio
+  Tre celle diverse per tre cose diverse: la fase registrata (v_thread_fase, EB7-3), lo stato del thread
+  (thread_offerta.stato) e, nella riga sotto, il fascicolo della RFQ. Lo stato del prodotto sta solo in R2. */}}
+
+{{define "ma_testa"}}{{$v := index . 0}}{{$d := $v.Dati}}{{$t := $d.Testa}}
+{{/* L'unico titolo di primo livello della pagina (layout.html non ne ha): nascosto a vista, letto dai lettori di schermo.
+   Sotto, un h2 per regione (R3-R10) e un h3 dentro le regioni. */}}
+<h1 class="ma-vh">Distinta della RFQ {{with $t.RiferimentoCliente}}{{.}}{{else}}senza riferimento{{end}}{{with $t.Cliente}} · {{.}}{{end}}</h1>
+<div class="ma-bc">
+  {{template "ma_ic" "file"}}<b>{{with $t.Cliente}}{{.}}{{else}}cliente non indicato{{end}}</b>{{template "ma_ic" "chev"}}<b class="ma-bc-rfq">RFQ {{with $t.RiferimentoCliente}}<span class="ma-mono">{{.}}</span>{{else}}senza riferimento{{end}}</b>
+  <span class="ma-sp"></span>
+  {{if $d.Esito}}<span class="ma-calcolato" title="L'esito si ricalcola a ogni apertura; non si salva niente.">calcolato alle {{data $d.Calcolato}}</span>{{end}}
+  <button type="button" class="ma-btn ma-btn--sm" data-ma-azione="aggiorna" title="Rilegge la pagina dal server. Non scrive niente.">{{template "ma_ic" "refresh"}} Aggiorna</button>
+  {{template "ma_menu_thread" $v}}
+  <button type="button" class="ma-btn ma-btn--sm" data-ma-azione="dati" title="Il JSON dell'esito, in sola lettura (solo per l'admin: contiene dati del cliente).">{ } Dati</button>
+</div>
+<section class="ma-cart" aria-label="Cartiglio della RFQ">
+  <div class="ma-cart-grid">
+    <div class="ma-cell ma-cell--rfq">
+      <span class="ma-lab">Richiesta d'offerta</span>
+      <span class="ma-cart-rif">{{with $t.RiferimentoCliente}}{{.}}{{else}}<i class="ma-muto">senza riferimento del cliente</i>{{end}}</span>
+      <span class="ma-cart-nome" title="{{$t.Oggetto}}">{{with $t.Oggetto}}{{.}}{{else}}<i class="ma-muto">senza oggetto</i>{{end}}</span>
+    </div>
+    <div class="ma-cell ma-cell--cli">
+      <span class="ma-lab">Cliente</span>
+      <span class="ma-v">{{with $t.Cliente}}{{.}}{{else}}<i class="ma-muto">cliente non indicato</i>{{end}}</span>
+    </div>
+    <div class="ma-cell ma-cell--fase">
+      <span class="ma-lab">Fase registrata</span>
+      {{/* RAC-26: l'etichetta del catalogo; il dominio «fase» solo se manca (D-RAC-03 aperto) */}}
+      {{with $t.Fase}}{{$fase := .}}<span class="ma-fase" title="fase = {{.Nome}} dal {{dataLunga .Inizio}} · semaforo: {{etichetta "semaforo" .Semaforo}}. La fase cambia solo con un gesto registrato.">
+        <i class="ma-semaforo ma-semaforo--{{.Semaforo}}" aria-hidden="true"></i><span class="ma-fase-t">{{with .Etichetta}}{{.}}{{else}}{{etichetta "fase" $fase.Nome}}{{end}}</span>
+        <span class="ma-muto ma-fase-gg">· {{.GgInFase}} gg{{with .Semaforo}} · <span class="ma-semaforo-t" title="semaforo = {{.}}">{{etichetta "semaforo" .}}</span>{{end}}{{if .Terminale}} · fase terminale{{end}}</span></span>
+      {{else}}<span class="ma-st ma-st--neu">nessuna fase aperta</span>{{end}}
+    </div>
+    <div class="ma-cell ma-cell--thread">
+      <span class="ma-lab">Stato del thread</span>
+      <span class="ma-v">{{with $t.StatoThread}}<span class="ma-st ma-st--neu ma-st--piatto" title="stato_thread = {{.}}">{{etichetta "stato_thread" .}}</span>{{else}}<span class="ma-muto" title="stato_thread: campo vuoto">—</span>{{end}}</span>
+    </div>
+    {{with $d.Esito}}{{$f := .Fascicolo}}
+    <div class="ma-cell ma-cell--r2 ma-cell--fasc">
+      <span class="ma-lab">Fascicolo della RFQ</span>
+      <span class="ma-v ma-fasc">{{if not $f.Calcolato}}
+        <span class="ma-st ma-st--na" title="fascicolo.calcolato = false">fascicolo non calcolato</span>{{else}}
+        <span class="ma-st ma-st--neu ma-st--piatto" title="numero_verificati / numero_target">{{$f.NumeroVerificati}} su {{$f.NumeroTarget}} prodotti verificati</span>
+        {{if $f.Congelabile}}<span class="ma-st ma-st--ok">congelabile</span>{{else}}<span class="ma-motivo" title="motivo_non_congelabile = {{$f.MotivoNonCongelabile}}">non congelabile{{with $f.MotivoNonCongelabile}}: {{etichetta "motivo_non_congelabile" .}}{{end}}</span>{{end}}
+        {{if $f.Congelato}}<span class="ma-st ma-st--ok">congelato</span>{{else}}<span class="ma-motivo" title="motivo_non_congelato = {{$f.MotivoNonCongelato}}">non congelato{{with $f.MotivoNonCongelato}}: {{etichetta "motivo_non_congelato" .}}{{end}}</span>{{end}}{{end}}
+      </span>
+    </div>
+    {{end}}
+  </div>
+</section>
+{{end}}
+
+{{/* Le azioni del thread: solo quelle che non hanno un posto nella pagina. «Prepara i file» parte SOLO da questo
+   pulsante, mai all'apertura (DB7-6), mai con «auto»; «Rifai l'analisi» sta in R3, «Riprova le copie» in R9. */}}
+{{define "ma_menu_thread"}}{{$d := .Dati}}{{$s := $d.Scrive}}
+<details class="ma-menu" data-ma-menu>
+  <summary class="ma-btn ma-btn--sm">Azioni del thread</summary>
+  <div class="ma-menu-corpo" role="group" aria-label="Azioni del thread">
+    <button type="button" class="ma-menu-voce" data-ma-gesto="/thread/{{$d.ThreadID}}/fascicolo/prepara" {{if not $s}}disabled{{end}}>Prepara i file<small>scarica, estrae e analizza i file del thread</small></button>
+    <button type="button" class="ma-menu-voce" data-ma-gesto="/thread/{{$d.ThreadID}}/smistamento/aggiorna" {{if not $s}}disabled{{end}}>Rifai lo smistamento<small>ricalcola le destinazioni dei file</small></button>
+  </div>
+</details>
+{{end}}
+
+{{/* Le strisce sotto il cartiglio: errore (così com'è, RAC-05), thread non valutato, sola lettura. Mai «tutto bene». */}}
+{{define "ma_strisce"}}{{$v := index . 0}}{{$d := $v.Dati}}
+{{with $d.Errore}}<div class="ma-striscia ma-striscia--ko" role="alert">{{template "ma_ic" "alert"}}<span>{{.}}</span></div>{{end}}
+{{with $d.Esito}}{{if not .Valutato}}<div class="ma-striscia ma-striscia--ver">{{template "ma_ic" "alert"}}<b>Thread non valutato.</b>
+  {{with .Motivo}}<span title="motivo_thread = {{.}}">{{etichetta "motivo_thread" .}}</span>{{else}}<span>Il server non ha dato il motivo.</span>{{end}}
+  <span class="ma-muto">Quello che segue non dice che va tutto bene.</span></div>{{end}}{{end}}
+{{if not $d.Scrive}}<div class="ma-striscia ma-striscia--neu">Sola lettura: i gesti sono spenti per questo utente.</div>{{end}}
+{{end}}
+
+{{/* ================================================================ R2 viste e prodotti
+  Le tre viste sono collegamenti che rileggono #ma (non una tablist: D-PF-14). */}}
+{{define "ma_viste"}}{{$v := index . 0}}{{$p := index . 1}}{{$d := $v.Dati}}{{$vista := or $d.Vista "distinta"}}{{$base := printf "/thread/%s/motore-a" $d.ThreadID}}
+{{$uD := printf "%s?prodotto=%s&vista=distinta" $base (urlquery $p.Rif)}}{{$uC := printf "%s?prodotto=%s&vista=documenti" $base (urlquery $p.Rif)}}{{$uR := printf "%s?prodotto=%s&vista=rfq" $base (urlquery $p.Rif)}}
+<nav class="ma-viste" id="ma-viste" aria-label="Viste della RFQ">
+  <a class="ma-vista" href="{{$uD}}" hx-get="{{$uD}}" hx-target="#ma" hx-swap="innerHTML" hx-push-url="true" {{if eq $vista "distinta"}}aria-current="page"{{end}}>{{template "ma_ic" "list"}}Distinta</a>
+  <a class="ma-vista" href="{{$uC}}" hx-get="{{$uC}}" hx-target="#ma" hx-swap="innerHTML" hx-push-url="true" {{if eq $vista "documenti"}}aria-current="page"{{end}}>{{template "ma_ic" "folder"}}Documenti</a>
+  <a class="ma-vista" href="{{$uR}}" hx-get="{{$uR}}" hx-target="#ma" hx-swap="innerHTML" hx-push-url="true" {{if eq $vista "rfq"}}aria-current="page"{{end}}>{{template "ma_ic" "grid"}}Riepilogo RFQ</a>
+</nav>
+{{end}}
+
+{{/* Le schede dei prodotti: sempre, anche con un prodotto solo. È l'unico posto dello stato del prodotto. */}}
+{{define "ma_ptabs"}}{{$v := index . 0}}{{$d := $v.Dati}}{{$vista := or $d.Vista "distinta"}}{{$base := printf "/thread/%s/motore-a" $d.ThreadID}}
+<nav class="ma-ptabs-guscio" id="ma-prodotti" aria-label="Prodotti della RFQ">
+  <div class="ma-ptabs">
+  {{range $d.Esito.ProdottiValutati}}{{$scelto := eq .Rif $d.Prodotto}}{{$u := printf "%s?prodotto=%s&vista=%s" $base (urlquery .Rif) $vista}}
+    <a class="ma-ptab" href="{{$u}}" hx-get="{{$u}}" hx-target="#ma" hx-swap="innerHTML" hx-push-url="true" {{if $scelto}}aria-current="true"{{end}} title="{{.Rif}}">
+      <span class="ma-ptab-t"><span class="ma-mono">{{or .CodiceRichiesto .Rif}}</span>
+        {{if .Motivi}}<span class="ma-k3" title="{{range $i, $m := .Motivi}}{{if $i}} · {{end}}{{etichetta "motivo_prodotto" $m}}{{end}}">motivi: {{len .Motivi}}</span>{{else}}<span class="ma-k3">nessun motivo</span>{{end}}</span>
+      <span class="ma-stato-prodotto">{{template "ma_st" (arr "stato_prodotto" .Stato)}}
+        {{if .Verificato}}<span class="ma-st ma-st--ok" title="prodotto_verificato = true">verificato</span>{{else}}<span class="ma-st ma-st--ver" title="prodotto_verificato = false">non verificato</span>{{end}}</span>
+    </a>
+  {{end}}
+  </div>
+</nav>
+{{end}}
+
+{{/* ================================================================ R3 conferma della fonte
+  A sinistra «come ha deciso» (motivo, estrazione, STEP confermato e la sua revoca); a destra «che cosa ha letto»:
+  la BOM di lavoro, una riga per struttura candidata (dalle schede cand di Indice.Gruppi) e gli altri candidati
+  (Indice.CandidatiFuori, FE-03). Nessuna struttura è preselezionata; nessun conteggio dei tipi (U-06). */}}
+
+{{define "ma_analisi"}}{{$v := index . 0}}{{$p := index . 1}}{{$d := $v.Dati}}{{$s := $d.Scrive}}{{$fo := $p.Fonte}}{{$gruppi := $d.Indice.Gruppi $p.Rif}}
+<section class="ma-fs ma-analisi-box{{if eq $fo.Stato "confermata"}} ma-analisi-box--ok{{end}}" id="ma-fonte" aria-labelledby="ma-fonte-t ma-fonte-lab">
+  <header>
+    {{if eq $fo.Stato "confermata"}}{{template "ma_ic" "check"}}{{else}}{{template "ma_ic" "cube"}}{{end}}
+    <h2 id="ma-fonte-t">Analisi del prodotto</h2>
+    <span class="ma-lab" id="ma-fonte-lab">Conferma della fonte</span>
+    {{if $fo.Calcolata}}{{template "ma_st" (arr "stato_fonte" $fo.Stato)}}{{else}}<span class="ma-st ma-st--na" title="fonte.calcolata = false">non calcolata</span>{{end}}
+    <span class="ma-sp"></span>
+    <button type="button" class="ma-btn ma-btn--sm" data-ma-gesto="/thread/{{$d.ThreadID}}/fascicolo/rianalizza" {{if not $s}}disabled{{end}} title="Rilegge gli STEP e accoda le analisi.">{{template "ma_ic" "refresh"}} Rifai l'analisi</button>
+  </header>
+  <div class="ma-analisi">
+    <div>
+      <span class="ma-lab">Come ha deciso</span>
+      <ul class="ma-decisioni">
+        <li><span>Fonte: {{with $fo.Motivo}}<span title="motivo_fonte = {{.}}">{{etichetta "motivo_fonte" .}}</span>{{else}}<span class="ma-muto">nessun motivo</span>{{end}}</span></li>
+        {{with $fo.Estrazione}}<li><span>Estrazione: <span title="estrazione = {{.}}">{{etichetta "estrazione" .}}</span></span></li>{{end}}
+        {{with $fo.Riferimento}}
+        <li class="ma-riferimento"><span>
+          <span class="ma-lab">STEP confermato</span>
+          <b class="ma-mono">{{with .AllegatoID}}{{with $d.Indice.NomeFile .}}{{.}}{{else}}file {{uuidBreve .}}{{end}}{{else}}documento {{uuidBreve .DocumentoID}}{{end}}</b>
+          {{with .ConfermatoIl}}<span class="ma-muto" title="{{.}}">il {{printf "%.10s" .}}</span>{{end}}
+          {{if .Superato}}<span class="ma-st ma-st--ver">superato da un file più recente</span>{{end}}
+          {{if and $p.ComponenteID (eq $fo.Stato "confermata")}}
+          <form class="ma-gesto ma-gesto--riga" data-ma-gesto="/thread/{{$d.ThreadID}}/fascicolo/componente/{{$p.ComponenteID}}/step-strutturale/revoca"
+                data-ma-domanda="Revocare lo STEP autorizzato di {{$p.CodiceRichiesto}}? I figli diretti tornano guida e la BOM di lavoro si svuota. Le decisioni già prese restano.">
+            <fieldset {{if not $s}}disabled{{end}}>
+              <input type="hidden" name="sha" value="{{.Sha256}}">
+              <label class="ma-campo"><span>Motivo</span><input name="motivo" maxlength="200" placeholder="facoltativo"></label>
+              <button class="ma-btn ma-btn--sm ma-btn--danger">Revoca l'autorizzazione</button>
+            </fieldset>
+          </form>
+          {{end}}
+        </span></li>
+        {{end}}
+        {{if not $p.ComponenteID}}<li><span class="ma-nota--ver">Il prodotto non ha ancora un componente, quindi lo STEP strutturale non si può autorizzare finché il prodotto non è un componente.</span></li>{{end}}
+      </ul>
+    </div>
+    <div>
+      <span class="ma-lab">Che cosa ha letto</span>
+      <ul class="ma-letti">
+      {{range $gruppi}}{{if eq .Tipo "bom"}}
+        <li class="ma-letto ma-letto--bom">
+          <span class="ma-letto-r1"><span class="ma-ext">BOM</span><b>BOM di lavoro</b>{{with .NomeFile}}<span class="ma-mono">{{.}}</span>{{end}}<span class="ma-muto">dallo STEP autorizzato · {{len .Nodi}} nodi nella scheda, con i confermati senza STEP sotto il loro padre</span>
+            <button type="button" class="ma-btn ma-btn--sm ma-btn--ghost" data-ma-azione="vai-scheda" data-ma-gruppo="{{.Chiave}}">vedi lo schema ↓</button></span>
+        </li>
+      {{end}}{{end}}
+      {{range $gruppi}}{{if eq .Tipo "cand"}}{{template "ma_cand_riga" (arr $v $p .)}}{{end}}{{end}}
+      {{if $p.StruttureCandidate}}
+        <li class="ma-muto ma-piccolo">Strutture candidate: {{len $p.StruttureCandidate}} · nessuna è scelta finché non si autorizza uno STEP.</li>
+      {{else if not $p.Nodi}}
+        <li class="ma-muto">Nessuna struttura candidata nell'esito per questo prodotto: nessuna è scelta.</li>
+      {{end}}
+      </ul>
+      {{with $d.Indice.CandidatiFuori $p.Rif}}
+      <details class="ma-dettagli" data-ma-ricorda="candidati">
+        <summary>Altri documenti candidati alla fonte ({{len .}})</summary>
+        <ul class="ma-elenco">
+        {{range .}}<li>
+          <span class="ma-mono">{{with .AllegatoID}}{{with $d.Indice.NomeFile .}}{{.}}{{else}}file {{uuidBreve .}}{{end}}{{else}}{{with .DocumentoID}}documento {{uuidBreve .}}{{else}}senza file{{end}}{{end}}</span>
+          <span class="ma-motivo" title="origine = {{.Origine}}">{{etichetta "origine_candidato" .Origine}}</span>
+          {{with .Estrazione}}<span class="ma-motivo" title="estrazione = {{.}}">estrazione: {{etichetta "estrazione" .}}</span>{{end}}
+          {{with .Compatibilita}}{{template "ma_st" (arr "compatibilita" .)}}{{end}}
+          {{if not .GrafoCompleto}}<span class="ma-motivo">grafo incompleto{{with .MotivoGrafo}}: {{etichetta "motivo_grafo" .}}{{end}}</span>{{end}}
+        </li>{{end}}
+        </ul>
+      </details>
+      {{end}}
+    </div>
+  </div>
+</section>
+{{end}}
+
+{{/* Una struttura candidata (una scheda cand di Indice.Gruppi): file, radice del file o nodo interno,
+   compatibilità, grafo, numero di nodi, «vedi lo schema» e «Autorizza lo STEP strutturale…». Gli ID del gesto li dà
+   Indice.AutorizzazioneDiStruttura (T-A1d-23); se lo STEP si può autorizzare lo dice l'anteprima, non questa riga. */}}
+{{define "ma_cand_riga"}}{{$v := index . 0}}{{$p := index . 1}}{{$g := index . 2}}{{$d := $v.Dati}}{{$s := $d.Scrive}}
+{{with $g.Struttura}}{{$sc := .}}
+<li class="ma-letto" aria-label="Struttura candidata {{$g.NomeFile}}">
+  <span class="ma-letto-r1"><span class="ma-ext ma-ext--step">STEP</span><b class="ma-mono" title="allegato {{$sc.AllegatoID}} · sha256 {{$sc.Sha256}}">{{with $g.NomeFile}}{{.}}{{else}}file {{uuidBreve $sc.AllegatoID}}{{end}}</b>
+    {{if $sc.RadiceDelFile}}<span class="ma-motivo">radice del file</span>{{else}}<span class="ma-motivo" title="radice = {{$sc.Radice}}">nodo interno del file</span>{{end}}</span>
+  <span class="ma-letto-r2">codice {{template "ma_st" (arr "compatibilita" $sc.Compatibilita)}}
+    · grafo {{if $sc.GrafoCompleto}}<span class="ma-st ma-st--ok">completo</span>{{else}}<span class="ma-st ma-st--ver">incompleto</span>{{with $sc.MotivoGrafo}} <span class="ma-motivo" title="motivo_grafo = {{.}}">{{etichetta "motivo_grafo" .}}</span>{{end}}{{end}}
+    · {{len $sc.Nodi}} nodi <button type="button" class="ma-btn ma-btn--sm ma-btn--ghost" data-ma-azione="vai-scheda" data-ma-gruppo="{{$g.Chiave}}">vedi lo schema ↓</button></span>
+  <span class="ma-letto-gesti">
+  {{if not $p.ComponenteID}}
+    {{template "ma_na" (arr "Autorizza lo STEP strutturale…" "Il prodotto non ha ancora un componente, e la rotta del gesto lo vuole.")}}
+  {{else}}{{with $d.Indice.AutorizzazioneDiStruttura $p.Rif $sc.AllegatoID $sc.Radice}}
+    <button type="button" class="ma-btn ma-btn--sm ma-btn--pri" data-ma-azione="step"
+            data-ma-componente="{{$p.ComponenteID}}" data-ma-documento="{{with .Documento}}{{.}}{{end}}" data-ma-nodo="{{.Nodo}}" data-ma-sorgente="{{.Sorgente}}"
+            data-ma-file="{{$g.NomeFile}}" data-ma-codice="{{$p.CodiceRichiesto}}" {{if not $s}}disabled{{end}}>{{template "ma_ic" "check"}} Autorizza lo STEP strutturale…</button>
+    <small class="ma-muto">Prima si legge l'anteprima del server; la casella «autorizzo» non è spuntata.</small>
+  {{else}}
+    {{/* D-RAC-02, P-14 aperta: si descrive la condizione di oggi del server, senza giudicarla */}}
+    {{template "ma_na" (arr "Autorizza lo STEP strutturale…" "Spento: nei dati della pagina non c'è un documento confermato del componente con questo file, né un nodo da delegare; oggi il gesto parte solo da lì.")}}
+  {{end}}{{end}}
+  </span>
+</li>
+{{end}}{{end}}
+
+{{/* ================================================================ R4 conferma dell'albero (SOPRA le schede)
+  È la conferma della struttura, per tutta la RFQ: prima il riepilogo del server, poi la firma. Non conferma la fonte
+  e non conferma i documenti. Una sola strada principale (U-07, R-B7-04); i contatori stanno qui e solo qui. */}}
+
+{{define "ma_barra_albero"}}{{$v := index . 0}}{{$p := index . 1}}{{$d := $v.Dati}}
+<section class="ma-salva-barra ma-barra-albero{{if $p.BOM.Verificata}} ma-salva-barra--ok{{else if not $p.Nodi}} ma-salva-barra--acc{{end}}" id="ma-albero" aria-labelledby="ma-albero-t">
+  <div class="ma-barra-riga">
+    {{if $p.BOM.Verificata}}{{template "ma_ic" "check"}}{{end}}
+    <h2 class="ma-lab" id="ma-albero-t">Conferma dell'albero</h2>
+    {{if $p.BOM.Verificata}}<span class="ma-st ma-st--ok" title="bom.verificata = true">BOM verificata</span>{{else}}<span class="ma-st ma-st--ver" title="bom.verificata = false">BOM non verificata</span>{{end}}
+    <span class="ma-barra-rfq">vale per tutta la RFQ ({{$d.Esito.Fascicolo.NumeroTarget}} {{if eq $d.Esito.Fascicolo.NumeroTarget 1}}prodotto{{else}}prodotti{{end}})</span>
+  </div>
+  <div class="ma-barra-assi">
+    <span>nomenclatura {{template "ma_st" (arr "stato_verifica_asse" $p.BOM.Nomenclatura.Stato)}}{{with $p.BOM.Nomenclatura.DaDecidere}} <span class="ma-motivo">{{.}} da decidere</span>{{end}}</span>
+    <span>gerarchia {{template "ma_st" (arr "stato_verifica_asse" $p.BOM.Gerarchia.Stato)}}{{with $p.BOM.Gerarchia.DaDecidere}} <span class="ma-motivo">{{.}} da decidere</span>{{end}}</span>
+    {{with $p.BOM.RimozioniAperte}}<span class="ma-motivo">{{.}} rimozioni aperte</span>{{end}}
+  </div>
+  <div class="ma-barra-riga ma-barra-gesto">
+    {{if not $p.Nodi}}<span class="ma-muto ma-piccolo">La BOM di lavoro non c'è ancora: se c'è qualcosa da confermare lo dice il riepilogo del server.</span>{{end}}
+    <button type="button" class="ma-btn{{if not $p.BOM.Verificata}} ma-btn--pri{{end}}" data-ma-azione="albero" {{if not $d.Scrive}}disabled{{end}}>{{template "ma_ic" "check"}} {{if $p.BOM.Verificata}}Rileggi il riepilogo dell'albero…{{else}}Leggi il riepilogo e conferma l'albero…{{end}}</button>
+  </div>
+  <p class="ma-nota ma-u07">La strada principale è "Conferma l'albero", dopo il riepilogo. Le decisioni nodo per nodo non rendono la BOM verificata e, prese prima del riepilogo, possono lasciarla da verificare.</p>
+  <p class="ma-k3 ma-piccolo">Conferma la struttura: non conferma la fonte e non conferma i documenti.</p>
+</section>
+{{end}}
+
+{{/* ================================================================ R5 albero a schede (U-05)
+  Una scheda per gruppo di Indice.Gruppi (bom, una per struttura candidata, senza), nell'ordine del server. La prima
+  scheda è quella visibile all'apertura: non è una scelta (nessuna candidata è segnata). Le candidate si vedono anche
+  prima dell'autorizzazione: «proposta dal file, non è la BOM». */}}
+
+{{define "ma_schede_albero"}}{{$v := index . 0}}{{$p := index . 1}}{{$d := $v.Dati}}{{$gruppi := $d.Indice.Gruppi $p.Rif}}
+<section class="ma-fs ma-schede-albero" id="ma-schede-albero" aria-labelledby="ma-schede-albero-t">
+  <header>
+    {{template "ma_ic" "list"}}<h2 id="ma-schede-albero-t">Albero del prodotto <span class="ma-mono">{{or $p.CodiceRichiesto $p.Rif}}</span></h2>
+    {{if not $p.Nodi}}<span class="ma-st ma-st--na" title="nessun nodo nella BOM di lavoro">BOM di lavoro: non ancora (si forma con lo STEP autorizzato)</span>{{end}}
+    <span class="ma-sp"></span>
+    {{if $gruppi}}<button type="button" class="ma-btn ma-btn--sm ma-btn--ghost" data-ma-azione="rami" data-ma-aperti="1">Apri tutto</button><button type="button" class="ma-btn ma-btn--sm ma-btn--ghost" data-ma-azione="rami" data-ma-aperti="0">Chiudi tutto</button>{{end}}
+  </header>
+  {{template "ma_strumenti" (arr $v $p)}}
+  {{/* revisione P3, M5: i tasti dell'albero sono quelli dell'organigramma (motore_a.mjs, tastiAlbero), non quelli del
+     modello WAI-ARIA del tree: si dicono qui, a voce (aria-describedby di ogni .ma-dtree) */}}
+  <p class="ma-vh" id="ma-tasti-albero">Albero come un organigramma: freccia giù porta al primo pezzo sotto, freccia su al padre, sinistra e destra ai pezzi accanto; più e meno aprono e chiudono un ramo; Invio apre l'anteprima del pezzo.</p>
+  {{with $gruppi}}
+  <div class="ma-schede" id="ma-schede" role="tablist" aria-label="Schede dell'albero">
+  {{$k := 0}}{{range $i, $g := .}}{{if eq $g.Tipo "cand"}}{{$k = add $k 1}}{{end}}
+    <button type="button" role="tab" id="ma-scheda-{{$i}}" class="ma-scheda ma-scheda--{{$g.Tipo}}" data-ma-azione="scheda" data-ma-gruppo="{{$g.Chiave}}"
+            aria-controls="ma-albero-{{$i}}" aria-selected="{{if eq $i 0}}true{{else}}false{{end}}" tabindex="{{if eq $i 0}}0{{else}}-1{{end}}"
+            {{if eq $g.Tipo "cand"}}title="proposta dal file, non è la BOM; nessuna struttura è scelta finché non si autorizza uno STEP"{{end}}>
+      {{- if eq $g.Tipo "bom"}}<b>BOM di lavoro</b>{{else if eq $g.Tipo "cand"}}<b>Candidata {{$k}}</b>{{else}}<b>Confermati senza STEP</b>{{end}}
+      <small>{{if $g.NomeFile}}{{$g.NomeFile}}{{else}}{{len $g.Nodi}} nodi{{end}}</small></button>
+  {{end}}
+  </div>
+  {{$k = 0}}{{range $i, $g := .}}{{if eq $g.Tipo "cand"}}{{$k = add $k 1}}{{end}}
+  <div role="tabpanel" id="ma-albero-{{$i}}" class="ma-pannello-albero ma-pannello-albero--{{$g.Tipo}}" data-ma-gruppo="{{$g.Chiave}}" aria-labelledby="ma-scheda-{{$i}}" {{if ne $i 0}}hidden{{end}}>
+    <div class="ma-tela-testa">
+    {{if eq $g.Tipo "bom"}}
+      <span class="ma-lab">BOM di lavoro</span>{{with $g.NomeFile}}<b class="ma-mono">{{.}}</b>{{end}}
+      <span class="ma-k3">dallo STEP autorizzato · {{len $g.Nodi}} nodi · i componenti confermati senza STEP compaiono sotto il loro padre</span>
+    {{else if eq $g.Tipo "cand"}}
+      <span class="ma-lab">Struttura candidata {{$k}}</span>{{with $g.NomeFile}}<b class="ma-mono">{{.}}</b>{{end}}
+      <span class="ma-k3">proposta dal file, non è la BOM · {{len $g.Nodi}} nodi</span>
+      <p class="ma-nota ma-nota--cand">Proposta dal file, non è la BOM. Nessuna struttura è scelta finché non si autorizza uno STEP: questa scheda è aperta solo per guardarla. I gesti dei nodi possono essere rifiutati finché lo STEP non è autorizzato: lo dice il server.</p>
+    {{else}}
+      <span class="ma-lab">Componenti confermati senza STEP</span><span class="ma-k3">{{len $g.Nodi}} nodi</span>
+      <p class="ma-nota">Il codice viene dal componente confermato, non da un file. Confermare componenti non conferma la fonte.</p>
+    {{end}}
+    </div>
+    {{template "ma_tela" (arr $v $p $g)}}
+  </div>
+  {{end}}
+  {{else}}
+    {{if not $p.ComponenteID}}<p class="ma-vuoto">Il prodotto non ha ancora un componente, quindi non c'è un albero da mostrare.</p>
+    {{else}}<p class="ma-vuoto">Nessuna struttura nell'esito per questo prodotto: né una BOM di lavoro, né strutture candidate, né componenti confermati.</p>{{end}}
+  {{end}}
+  <div class="ma-legenda" role="group" aria-label="Legenda">
+    <span><i class="ma-leg-linea ma-leg-linea--file"></i>legame del file (da confermare)</span>
+    <span><i class="ma-leg-linea ma-leg-linea--conf"></i>legame confermato (nel file; per i confermati senza STEP il file non c'è)</span>
+    <span><span class="ma-badge ma-badge--conf">confermato sotto Y ✓×q</span> relazione confermata fuori dal file</span>
+    <span><span class="ma-badge">⧉ 2 padri nel file</span> sotto più padri</span>
+    <span><i class="ma-leg-box"></i>componente · <i class="ma-leg-box ma-leg-box--tratt"></i>proposta · <i class="ma-leg-box ma-leg-box--scart"></i>scartata</span>
+    <span><b class="ma-segno ma-segno--conf">✓</b> confermato · <b class="ma-segno ma-segno--man">✎</b> a mano · <b class="ma-segno ma-segno--prop">◇</b> proposto · <b class="ma-segno">«»</b> letto nel file</span>
+    <span class="ma-muto">· si trascina solo nella BOM di lavoro e fra i confermati senza STEP: apre il modulo «Sposta»</span>
+  </div>
+  <div class="ma-regola">{{template "ma_ic" "alert"}}<span>Che cosa può stare sotto che cosa lo decide il server: se uno spostamento non è ammesso, il rifiuto lo dice e niente cambia.</span></div>
+</section>
+{{end}}
+
+{{/* Gli strumenti della distinta: le aggiunte restano visibili e spente col motivo (la bozza dell'albero resta
+   vuota, DB7-5; nessun codice d'assieme parte dal browser, DB7-7). Nessun contatore: stanno in R4. */}}
+{{define "ma_strumenti"}}
+<div class="ma-strumenti" role="group" aria-label="Strumenti della distinta" aria-describedby="ma-strumenti-perche">
+  <button type="button" class="ma-btn ma-btn--t-ass" disabled>{{template "ma_ic" "plus"}} {{etichetta "tipo_componente" "sottoassieme"}}</button>
+  <button type="button" class="ma-btn ma-btn--t-par" disabled>{{template "ma_ic" "plus"}} {{etichetta "tipo_componente" "sciolto"}}</button>
+  <button type="button" class="ma-btn ma-btn--t-com" disabled>{{template "ma_ic" "plus"}} {{etichetta "tipo_componente" "commerciale"}}</button>
+  <button type="button" class="ma-btn" disabled>{{template "ma_ic" "folder"}} Dal catalogo componenti</button>
+  <small class="ma-strumenti-perche" id="ma-strumenti-perche">⊘ Non ancora disponibile: in questa pagina la bozza dell'albero resta vuota e nessun codice d'assieme parte dal browser (DB7-5, DB7-7).</small>
+</div>
+{{end}}
+
+{{/* La tela di un gruppo: le radici da Indice.Radici (FE-04), niente cicli sui nodi qui. */}}
+{{define "ma_tela"}}{{$v := index . 0}}{{$p := index . 1}}{{$g := index . 2}}{{$d := $v.Dati}}
+<div class="ma-tela" data-ma-gruppo="{{$g.Chiave}}">
+  {{with $d.Indice.Radici $p.Rif $g.Chiave}}
+  <ul class="ma-dtree" role="tree" aria-describedby="ma-tasti-albero" aria-label="{{if eq $g.Tipo "bom"}}BOM di lavoro{{else if eq $g.Tipo "cand"}}Struttura candidata {{$g.NomeFile}}{{else}}Componenti confermati senza STEP{{end}}">
+  {{range .}}{{template "ma_li" (arr $v $p $g . nil 0 (printf "%s>%s" $g.Chiave .Nodo.Rif))}}{{end}}
+  </ul>
+  {{else}}<p class="ma-vuoto">Nessun nodo in questa scheda.</p>{{end}}
+</div>
+{{end}}
+
+{{/* Una casella. I figli da Indice.Figli (un figlio con due padri compare sotto tutti e due); i legami da
+  Indice.Legami. Linea del figlio: ma-li--file (tratteggio) = legame del file non confermato; ma-li--conf (pieno) =
+  legame confermato (Figli[].Decisa). Chiave «<gruppo>|<rif>»; cammino «<gruppo>><rif>><rif>…» unico. Trascinare = il
+  gesto Sposta, solo nelle schede bom e senza (D-PF-05), solo con Scrive, solo per un componente con al più una
+  relazione confermata corrente (il «Da» del modulo: Legami.Confermati, FE-08). Profondità massima 24.
+  Il componente della casella ($cid, $cod): Nodo.Decisione; altrimenti, SOLO nella scheda bom e SOLO per la radice della
+  BOM di lavoro (Rif = gruppoMA.Radice), il componente del prodotto (contratto E3 «la radice prende il componente del
+  target»; la stessa regola di componenteDelNodoMA, T-A1d-22, e di val/nodi.go componenteDelNodo). La radice di una
+  candidata non lo prende mai. Lo stesso calcolo sta in ma_anteprima e ma_gesti_nodo (vedi i DUBBI: D-FEA-05). */}}
+{{define "ma_li"}}{{$v := index . 0}}{{$p := index . 1}}{{$g := index . 2}}{{$n := index . 3}}{{$arco := index . 4}}{{$liv := index . 5}}{{$cam := index . 6}}{{$d := $v.Dati}}{{$t := $d.ThreadID}}
+{{$figli := $d.Indice.Figli $p.Rif $g.Chiave $n.Nodo.Rif}}{{$leg := $d.Indice.Legami $p.Rif $g.Chiave $n.Nodo.Rif}}
+{{$scartata := false}}{{with $n.Nodo.RigaDecisa}}{{if eq .Stato "scartata"}}{{$scartata = true}}{{end}}{{end}}
+{{$cid := ""}}{{$cod := ""}}{{with $n.Nodo.Decisione}}{{$cid = .ComponenteID}}{{$cod = .Codice}}{{else}}{{if and (eq $g.Tipo "bom") (eq $n.Nodo.Rif $g.Radice)}}{{with $d.Indice.Componente $p.ComponenteID}}{{$cid = .ID}}{{$cod = .Codice}}{{end}}{{end}}{{end}}
+{{$sposta := false}}{{$da := ""}}{{$daCod := "la radice"}}
+{{if and $d.Scrive $cid $arco (ne $g.Tipo "cand") (le (len $leg.Confermati) 1)}}{{$sposta = true}}{{range $leg.Confermati}}{{$da = .PadreID.String}}{{$daCod = .Codice}}{{end}}{{end}}
+<li role="treeitem" aria-level="{{add $liv 1}}" aria-selected="false" tabindex="-1" {{if $figli}}aria-expanded="true"{{end}}
+    class="{{if $arco}}{{if $arco.Decisa}}ma-li--conf{{else}}ma-li--file{{end}}{{end}}"
+    data-ma-chiave="{{$g.Chiave}}|{{$n.Nodo.Rif}}" data-ma-rif="{{$n.Nodo.Rif}}" data-ma-cammino="{{$cam}}"
+    aria-label="{{template "ma_catena_testo" $n}}{{with $n.Tipo}}, {{etichetta "tipo_componente" .}}{{end}}{{if not $cid}}, da decidere{{else}}{{if not $n.Nodo.Decisione}}, componente del prodotto {{$cod}}{{end}}{{end}}{{if $scartata}}, scartata{{end}}{{if $arco}}{{with $arco.Quantita}}, ×{{.}} dal file{{end}}{{with $arco.QuantitaConfermata}}, ×{{.}} confermata{{else}}{{if not $arco.Decisa}}, legame da confermare{{end}}{{end}}{{end}}{{if gt (len $leg.DelFile) 1}}, {{len $leg.DelFile}} padri nel file{{end}}">
+  <div class="ma-nodo-box">
+    {{if $arco}}<span class="ma-qta-arco">{{template "ma_qta" (arr $g $arco)}}</span>{{end}}
+    <div class="ma-nodo ma-nodo--{{or $n.Tipo "nd"}}{{if not $cid}} ma-nodo--proposto{{end}}{{if $scartata}} ma-nodo--scartato{{end}}"
+         {{if $sposta}}draggable="true" data-ma-sposta="/thread/{{$t}}/fascicolo/componente/{{$cid}}/sposta" data-ma-da="{{$da}}" data-ma-da-cod="{{$daCod}}"{{end}}
+         {{if $cid}}{{if and $d.Scrive (ne $g.Tipo "cand")}}data-ma-drop="{{$cid}}"{{end}} data-ma-cod="{{$cod}}"{{end}}>
+      <span class="ma-nodo-testa">{{template "ma_tipo" $n}}{{template "ma_nodo_tag" (arr $n $cid)}}</span>
+      {{if eq $n.Classificazione.Proposta "minuteria"}}<span class="ma-cat" title="classificazione.proposta = minuteria (non confermata): non è un'esenzione dal 2D">minuteria proposta</span>{{end}}
+      {{if and (eq $n.Classificazione.Categoria "minuteria") $n.Classificazione.Confermata}}<span class="ma-cat ma-cat--ok" title="categoria = minuteria, confermata">minuteria confermata</span>{{end}}
+      {{template "ma_catena_breve" $n}}
+      {{/* revisione P3, B2: la radice della BOM di lavoro senza Decisione prende il componente del prodotto ($cid, E3):
+         lo si scrive accanto al codice del file, che resta col suo segno (◇ proposto) */}}
+      {{if and $cid (not $n.Nodo.Decisione)}}<span class="ma-cat ma-cat--ok" title="contratto E3: la radice della BOM di lavoro prende il componente del prodotto">componente del prodotto ✓ {{$cod}}</span>{{end}}
+      {{with $n.Descrizione}}<span class="ma-nodo-nome" title="{{.}}">{{.}}</span>{{end}}
+      {{template "ma_legami_box" (arr $v $p $g $n $leg)}}
+      {{with $n.Disegni.Primario}}{{template "ma_mini" (arr .Anteprima .NomeFile "casella")}}{{else}}<span class="ma-mini ma-mini--na" aria-hidden="true">nessun 2D associato</span>{{end}}
+      {{template "ma_celle" (arr $v $p $cid)}}
+      {{if $figli}}<button type="button" class="ma-ramo" data-ma-azione="ramo" tabindex="-1" aria-label="Apri o chiudi i {{len $figli}} pezzi sotto"><span class="ma-ramo-segno" aria-hidden="true"></span> {{len $figli}} sotto</button>{{end}}
+    </div>
+  </div>
+  {{if and $figli (lt $liv 24)}}<ul role="group">
+  {{range $figli}}{{template "ma_li" (arr $v $p $g .Nodo . (add $liv 1) (printf "%s>%s" $cam .Nodo.Nodo.Rif))}}{{end}}
+  </ul>{{end}}
+</li>
+{{end}}
+
+{{/* La quantità del legame: quella del file e quella confermata, una accanto all'altra, in parole (C-16). */}}
+{{define "ma_qta"}}{{$g := index . 0}}{{$a := index . 1}}
+{{- with $a.Quantita}}<span class="ma-qta" title="quantità letta nel file">×{{.}} dal file</span>{{end -}}
+{{- with $a.QuantitaConfermata}}<span class="ma-qta ma-qta--conf" title="quantità della relazione confermata">✓×{{.}} confermata</span>{{else}}{{if $a.Decisa}}<span class="ma-qta ma-qta--manca" title="relazione confermata senza quantità">confermato · qtà —</span>{{else}}<span class="ma-qta ma-qta--manca" title="legame non ancora confermato">da confermare</span>{{end}}{{end -}}
+{{end}}
+
+{{/* I segni della casella dai legami (FE-05): «⧉ n padri nel file»; «confermato sotto Y ✓×q» per una relazione
+   confermata corrente che non è nel file (solo per una casella che viene da un file; per un componente senza STEP
+   il file non c'è); «anche in» per un altro prodotto. */}}
+{{define "ma_legami_box"}}{{$v := index . 0}}{{$n := index . 3}}{{$leg := index . 4}}{{$d := $v.Dati}}
+{{if or (gt (len $leg.DelFile) 1) (and (not $n.Nodo.SenzaFile) $leg.Confermati) $n.AncheIn}}<span class="ma-nodo-badge">
+  {{if gt (len $leg.DelFile) 1}}<span class="ma-badge" title="Nel file questo pezzo sta sotto {{len $leg.DelFile}} padri: compare sotto ciascuno.">⧉ {{len $leg.DelFile}} padri nel file</span>{{end}}
+  {{if not $n.Nodo.SenzaFile}}{{range $leg.Confermati}}{{if not .NelFile}}<span class="ma-badge ma-badge--conf" title="relazione confermata corrente, non nel file">confermato sotto {{.Codice}} ✓×{{.Qta}}</span>{{end}}{{end}}{{end}}
+  {{range $n.AncheIn}}<span class="ma-badge" title="{{.}}">anche in {{with $d.Indice.Prodotto .}}{{or .CodiceRichiesto .Rif}}{{else}}{{.}}{{end}}</span>{{end}}
+</span>{{end}}
+{{end}}
+
+{{/* La decisione del nodo, come etichetta della casella: riga aperta = da decidere; riga decisa = il suo stato;
+   componente (la Decisione, o il prodotto per la radice della BOM di lavoro: $cid di ma_li) = nessuna etichetta
+   (casella piena); nessuna delle due = nessuna proposta. Prende (arr $n $cid). */}}
+{{define "ma_nodo_tag"}}{{$n := index . 0}}{{$cid := index . 1}}{{if $n.Nodo.RigaLegacy}}<span class="ma-proposto-tag" title="riga aperta di componente_proposta">da decidere</span>
+{{else if $n.Nodo.RigaDecisa}}{{template "ma_st" (arr "stato_riga" $n.Nodo.RigaDecisa.Stato)}}
+{{else if not $cid}}<span class="ma-proposto-tag ma-proposto-tag--neu" title="nessuna riga di componente_proposta per questo nodo">nessuna proposta</span>{{end}}{{end}}
+
+{{/* Il codice della casella: il primo dei valori della catena (stessa precedenza di ma_catena_testo), col suo segno;
+   gli altri valori si contano con +n e stanno per intero nell'anteprima */}}
+{{define "ma_catena_breve"}}{{$n := .}}{{$c := .Nodo.Codice}}
+{{$k := 0}}{{if or $c.Confermato $n.Nodo.Decisione}}{{$k = add $k 1}}{{end}}{{if $c.Manuale}}{{$k = add $k 1}}{{end}}{{if $c.Proposto}}{{$k = add $k 1}}{{end}}
+<span class="ma-nodo-cod">
+{{- with $c.Confermato}}<b class="ma-segno ma-segno--conf" title="codice confermato">✓</b>{{.Codice}}{{with .Rev}}<span class="ma-rev">rev {{.}}</span>{{end}}
+{{- else}}{{with $n.Nodo.Decisione}}<b class="ma-segno ma-segno--conf" title="codice del componente confermato">✓</b>{{.Codice}}{{with .Rev}}<span class="ma-rev">rev {{.}}</span>{{end}}
+{{- else}}{{with $c.Manuale}}<b class="ma-segno ma-segno--man" title="codice corretto a mano">✎</b>{{.Codice}}{{with .Rev}}<span class="ma-rev">rev {{.}}</span>{{end}}
+{{- else}}{{with $c.Proposto}}<b class="ma-segno ma-segno--prop" title="codice proposto dal file">◇</b>{{.}}
+{{- else}}{{with $c.Grezzo.Testo}}<span class="ma-grezzo" title="testo letto nel file: non è ancora un codice">«{{.}}»</span>{{else}}<span class="ma-st ma-st--na">senza codice</span>{{end}}{{end}}{{end}}{{end}}{{end}}
+{{- if gt $k 1}}<span class="ma-piu" title="{{with $c.Manuale}}a mano: {{.Codice}} · {{end}}{{with $c.Proposto}}proposto: {{.}}{{end}} — la catena intera è nell'anteprima">+{{sub $k 1}}</span>{{end -}}
+</span>{{end}}
+
+{{/* La catena dei codici (anteprima, conflitti, posizione): ogni valore con il suo segno, mai fusi in uno */}}
+{{define "ma_catena"}}{{$n := .}}{{$c := .Nodo.Codice}}<span class="ma-catena">
+{{with $c.Confermato}}<span class="ma-cod ma-cod--conf" title="codice confermato · origine {{.Origine}}">✓ {{.Codice}}{{with .Rev}}<span class="ma-rev">rev {{.}}</span>{{end}}</span>{{else}}{{with $n.Nodo.Decisione}}<span class="ma-cod ma-cod--conf" title="codice del componente confermato · origine {{.Origine}}">✓ {{.Codice}}{{with .Rev}}<span class="ma-rev">rev {{.}}</span>{{end}}</span>{{end}}{{end}}
+{{with $c.Manuale}}<span class="ma-cod ma-cod--man" title="codice corretto a mano · origine {{.Origine}}">✎ {{.Codice}}{{with .Rev}}<span class="ma-rev">rev {{.}}</span>{{end}}</span>{{end}}
+{{with $c.Proposto}}<span class="ma-cod ma-cod--prop" title="codice proposto dal file">◇ {{.}}</span>{{end}}
+{{if not (or $c.Confermato $n.Nodo.Decisione $c.Manuale $c.Proposto)}}{{with $c.Grezzo.Testo}}<span class="ma-cod ma-cod--grezzo" title="testo letto nel file: non è ancora un codice">«{{.}}»</span>{{else}}<span class="ma-st ma-st--na">senza codice</span>{{end}}{{end}}
+</span>{{end}}
+
+{{/* Testo semplice della catena, per le domande di conferma e le etichette */}}
+{{define "ma_catena_testo"}}{{$c := .Nodo.Codice}}{{with $c.Confermato}}{{.Codice}}{{else}}{{with $.Nodo.Decisione}}{{.Codice}}{{else}}{{with $c.Manuale}}{{.Codice}} (a mano){{else}}{{with $c.Proposto}}{{.}} (proposto){{else}}«{{$c.Grezzo.Testo}}»{{end}}{{end}}{{end}}{{end}}{{end}}
+
+{{/* Il tipo lo dà il server (Tipo, OrigineTipo): qui solo la forma (pieno se confermato, tratteggio e «?» se no) */}}
+{{define "ma_tipo"}}{{if .Tipo}}{{$prop := ne .OrigineTipo "confermato"}}<span class="ma-tipo ma-tipo--{{.Tipo}}{{if $prop}} ma-tipo--proposto{{end}}" title="tipo_componente = {{.Tipo}} · origine_tipo = {{.OrigineTipo}}{{with .OrigineTipo}} ({{etichetta "origine_tipo" .}}){{end}}">{{etichetta "tipo_componente" .Tipo}}{{if $prop}}<span class="ma-tipo-q" aria-hidden="true"> ?</span><span class="ma-vh"> (tipo proposto, non confermato)</span>{{end}}</span>{{else}}<span class="ma-st ma-st--na" title="tipo vuoto">tipo non determinato</span>{{end}}{{end}}
+
+{{/* La miniatura di un PDF (X-09, FE-06): un RiferimentoAnteprima (valore o puntatore, anche nil). Solo con
+   Disponibile, l'allegato e lo sha: lo spazio che motore_a.mjs riempie con la pagina 1 (pdf.js, una GET di
+   /allegato/{id}/anteprima?v=<sha>). Altrimenti «anteprima non disponibile». Mai un disegno inventato; aria-hidden: il
+   nome del file è sempre scritto accanto. */}}
+{{define "ma_mini"}}{{$a := index . 0}}{{$nome := index . 1}}{{$misura := index . 2}}
+{{- if $a}}{{if and $a.Disponibile $a.AllegatoID $a.Sha256}}<span class="ma-mini ma-mini--{{$misura}}" data-ma-mini="{{$misura}}" data-ma-allegato="{{$a.AllegatoID}}" data-ma-sha="{{$a.Sha256}}" data-ma-stato="attesa" aria-hidden="true" title="{{$nome}}"></span>
+{{- else}}<span class="ma-mini ma-mini--{{$misura}} ma-mini--na" aria-hidden="true" title="{{$nome}}">anteprima non disponibile</span>{{end}}
+{{- else}}<span class="ma-mini ma-mini--{{$misura}} ma-mini--na" aria-hidden="true" title="{{$nome}}">anteprima non disponibile</span>{{end}}
+{{- end}}
+
+{{/* Le celle dei documenti della casella, per un componente ($cid di ma_li, "" se il nodo non è un componente):
+   Indice.Voce (niente doppio ciclo, C-15). Esito e copia sul NAS restano due segni distinti. */}}
+{{define "ma_celle"}}{{$v := index . 0}}{{$p := index . 1}}{{$cid := index . 2}}{{$d := $v.Dati}}
+{{if $cid}}
+<span class="ma-celle">
+{{range $tipo := list "cad_3d" "disegno_2d" "sviluppo_dxf"}}{{with $d.Indice.Voce $p.Rif $cid $tipo}}
+  <span class="ma-cella ma-cella--{{if eq .Esito "presente"}}ok{{else if eq .Esito "da_verificare"}}sugg{{else if eq .Esito "manca"}}manca{{else}}neu{{end}}"
+        title="{{etichetta "tipo_documento" .TipoDocumento}}: {{etichetta "esito_fabbisogno" .Esito}}{{with .StatoNas}} · {{etichetta "stato_nas" .}}{{end}}">
+    {{- if eq $tipo "cad_3d"}}3D{{else if eq $tipo "disegno_2d"}}2D{{else}}DXF{{end}} {{if eq .Esito "presente"}}✓{{else if eq .Esito "da_verificare"}}✓?{{else if eq .Esito "manca"}}✗{{else}}–{{end}}
+    {{- if eq .StatoNas "scritto"}} · NAS ✓{{else if eq .StatoNas "in_coda"}} · NAS ◷{{else if eq .StatoNas "errore"}} · NAS ✗{{end}}</span>
+{{end}}{{end}}
+</span>
+{{end}}{{end}}
+
+{{/* ================================================================ R6 anteprima persistente
+  Un pannello per ogni nodo di ogni gruppo (T-A1d-FE-05), chiave «<gruppo>|<rif>»: la casella scelta mostra il suo.
+  Prima il disegno, poi alternativi e revisione, poi le sezioni ricordate (Codice, Tipo, Posizione, Disegni, Motivi,
+  Gesti). Sopravvive alla rilettura di #ma (motore_a.mjs, sessionStorage); sotto 860 px è un foglio dal basso. Nessuna
+  casella è scelta all'apertura (D-PF-06). */}}
+{{define "ma_anteprime"}}{{$v := index . 0}}{{$p := index . 1}}{{$d := $v.Dati}}
+<aside class="ma-ws-lato ma-anteprime" id="ma-anteprima" aria-label="Anteprima della casella scelta">
+  <div class="ma-fs ma-anteprima-vuota"><p class="ma-hint">Scegli una casella: qui compaiono il disegno, i codici, la posizione e i gesti.</p></div>
+  {{range $g := $d.Indice.Gruppi $p.Rif}}{{range $g.Nodi}}{{template "ma_anteprima" (arr $v $p $g .)}}{{end}}{{end}}
+</aside>
+{{end}}
+
+{{define "ma_anteprima"}}{{$v := index . 0}}{{$p := index . 1}}{{$g := index . 2}}{{$n := index . 3}}{{$d := $v.Dati}}{{$c := $n.Nodo.Codice}}
+{{$scartata := false}}{{with $n.Nodo.RigaDecisa}}{{if eq .Stato "scartata"}}{{$scartata = true}}{{end}}{{end}}
+{{$cid := ""}}{{$cod := ""}}{{with $n.Nodo.Decisione}}{{$cid = .ComponenteID}}{{$cod = .Codice}}{{else}}{{if and (eq $g.Tipo "bom") (eq $n.Nodo.Rif $g.Radice)}}{{with $d.Indice.Componente $p.ComponenteID}}{{$cid = .ID}}{{$cod = .Codice}}{{end}}{{end}}{{end}}
+<section class="ma-fs ma-anteprima{{if not $cid}} ma-anteprima--proposto{{end}}" data-ma-pannello="{{$g.Chiave}}|{{$n.Nodo.Rif}}" data-ma-gruppo="{{$g.Chiave}}" hidden aria-label="Anteprima di {{template "ma_catena_testo" $n}}">
+  {{/* nell'ordine del DOM come a vista: etichetta, titolo, tipo, ✕ (finding 19: niente order nel CSS) */}}
+  <header class="ma-anteprima-testa">
+    <span class="ma-lab">{{if eq $g.Tipo "bom"}}BOM di lavoro{{else if eq $g.Tipo "cand"}}Struttura candidata{{with $g.NomeFile}} · {{.}}{{end}}{{else}}Confermati senza STEP{{end}} · {{if $scartata}}scartata{{else if $n.Nodo.RigaLegacy}}da decidere{{else if $n.Nodo.Decisione}}componente{{else if $cid}}componente del prodotto (radice della BOM di lavoro){{else}}non ancora un componente{{end}}</span>
+    <h2 class="ma-anteprima-t ma-mono" tabindex="-1">{{template "ma_catena_testo" $n}}</h2>
+    {{template "ma_tipo" $n}}
+    <button type="button" class="ma-btn ma-btn--sm ma-btn--ghost ma-chiudi" data-ma-azione="chiudi-anteprima" aria-label="Chiudi l'anteprima">{{template "ma_ic" "x"}}</button>
+  </header>
+  {{with $n.Descrizione}}<p class="ma-dett-nome">{{.}}</p>{{end}}
+  {{template "ma_palco" (arr $v $n)}}
+  {{template "ma_alt_strip" (arr $v $n)}}
+  {{with $n.Disegni.Primario}}{{template "ma_rev_disegno" (arr . false)}}{{end}}
+  {{range $n.Disegni.Alternativi}}{{template "ma_rev_disegno" (arr . true)}}{{end}}
+
+  <details class="ma-sez" data-ma-ricorda="sez-codice">
+    <summary><h3 class="ma-sez-t">Codice</h3></summary>
+    <dl class="ma-dl">
+      <dt>Catena</dt><dd>{{template "ma_catena" $n}}</dd>
+      <dt>Letto nel file</dt><dd>{{with $c.Grezzo.Testo}}<span class="ma-mono">«{{.}}»</span>{{with $c.Grezzo.Campo}} <span class="ma-muto">dal campo {{.}}</span>{{end}}{{else}}<span class="ma-muto">—</span>{{end}}
+        {{with $c.MotivoLettura}}<span class="ma-motivo" title="motivo_lettura = {{.}}">{{etichetta "motivo_lettura" .}}</span>{{end}}</dd>
+      <dt>Proposto</dt><dd>{{with $c.Proposto}}<span class="ma-cod ma-cod--prop">◇ {{.}}</span>{{else}}<span class="ma-muto">—</span>{{end}}{{with $c.MotivoProposto}} <span class="ma-motivo" title="motivo_proposto = {{.}}">{{etichetta "motivo_proposto" .}}</span>{{end}}</dd>
+      <dt>A mano</dt><dd>{{with $c.Manuale}}<span class="ma-cod ma-cod--man">✎ {{.Codice}}{{with .Rev}} rev {{.}}{{end}}</span> <span class="ma-motivo" title="origine = {{.Origine}}">da: {{etichetta "origine_dato" .Origine}}</span>{{else}}<span class="ma-muto">—</span>{{end}}</dd>
+      <dt>Confermato</dt><dd>{{with $c.Confermato}}<span class="ma-cod ma-cod--conf">✓ {{.Codice}}{{with .Rev}} rev {{.}}{{end}}</span> <span class="ma-motivo" title="origine = {{.Origine}}">da: {{etichetta "origine_dato" .Origine}}</span>{{with .RevProvenienza}} <span class="ma-motivo" title="rev_provenienza = {{.}}">{{etichetta "rev_provenienza" .}}</span>{{end}}{{else}}<span class="ma-muto">—</span>{{end}}</dd>
+      <dt>Componente</dt><dd>{{with $n.Nodo.Decisione}}<span class="ma-cod ma-cod--conf">✓ {{.Codice}}{{with .Rev}} rev {{.}}{{end}}</span> <span class="ma-motivo" title="autorita = {{.Autorita}}">autorità: {{etichetta "autorita" .Autorita}}</span> <span class="ma-motivo" title="origine = {{.Origine}}">da: {{etichetta "origine_dato" .Origine}}</span>{{else}}{{if $cid}}<span class="ma-cod ma-cod--conf">✓ {{$cod}}</span> <span class="ma-motivo" title="contratto E3: la radice della BOM di lavoro prende il componente del target">il componente del prodotto</span>{{else}}<span class="ma-muto">non ancora un componente</span>{{end}}{{end}}
+        {{if $n.Nodo.DecisoDaPersona}}<span class="ma-motivo" title="deciso_da_persona = true">da una persona</span>{{end}}</dd>
+      {{with $c.Identita}}{{if or .Base .Revisione}}<dt>Identità</dt><dd><span class="ma-mono">{{.Base}}</span>{{with .Revisione}} rev {{.}}{{end}} {{with .StatoRevisione}}{{template "ma_st" (arr "stato_revisione" .)}}{{end}}
+        {{range .CandidatiRevisione}}<span class="ma-motivo" title="fonte = {{.Fonte}}">rev {{.Valore}} · {{etichetta "fonte_revisione" .Fonte}}</span>{{end}}</dd>{{end}}{{end}}
+      {{range $c.Documentale}}<dt>Dal documento</dt><dd><span class="ma-mono">{{or .Originale .Lettura}}</span> {{template "ma_st" (arr "esito_riconciliazione" .Esito)}}
+        {{with .Correzione}}<span class="ma-motivo">correzione proposta: {{.Codice}}{{with .Revisione}} rev {{.}}{{end}}</span>{{end}}
+        {{with .Motivo}}<span class="ma-motivo" title="motivo = {{.}}">{{etichetta "motivo_documentale" .}}</span>{{end}}
+        {{range .Discordanze}}<span class="ma-motivo ma-motivo--ko" title="{{.Motivo}}">discorda sul {{.Parte}} con {{.Decisione.Codice}}</span>{{end}}</dd>{{end}}
+      {{with $n.Nodo.AbbinamentoPerBase}}<dt>Stessa base</dt><dd>{{len .Componenti}} componenti{{with .Motivo}} · <span title="{{.}}">{{etichetta "motivo_abbinamento" .}}</span>{{end}}{{with .MotivoDecisione}} · <span title="{{.}}">{{etichetta "motivo_abbinamento" .}}</span>{{end}}</dd>{{end}}
+      <dt>Riferimento</dt><dd><span class="ma-mono ma-rif-tecnico" title="riferimento calcolato: non è un ID">{{$n.Nodo.Rif}}</span></dd>
+    </dl>
+  </details>
+
+  <details class="ma-sez" data-ma-ricorda="sez-tipo">
+    <summary><h3 class="ma-sez-t">Tipo e classificazione</h3></summary>
+    <dl class="ma-dl">
+      <dt>Tipo</dt><dd>{{template "ma_tipo" $n}}{{with $n.OrigineTipo}} <span class="ma-motivo" title="origine_tipo = {{.}}">{{etichetta "origine_tipo" .}}</span>{{end}}</dd>
+      <dt>Ruolo</dt><dd>{{with $n.Classificazione.Ruolo}}{{etichetta "ruolo" .}}{{else}}<span class="ma-muto">—</span>{{end}}</dd>
+      <dt>Categoria</dt><dd>{{template "ma_st" (arr "categoria" $n.Classificazione.Categoria)}}
+        {{if $n.Classificazione.Confermata}}<span class="ma-motivo">categoria confermata</span>{{else}}<span class="ma-motivo">categoria non confermata</span>{{end}}
+        {{with $n.Classificazione.Origine}}<span class="ma-motivo" title="origine = {{.}}">da: {{etichetta "origine_categoria" .}}</span>{{end}}
+        {{with $n.Classificazione.Motivo}}<span class="ma-motivo" title="motivo = {{.}}">{{etichetta "motivo_classificazione" .}}</span>{{end}}</dd>
+      {{if eq $n.Classificazione.Proposta "minuteria"}}<dt>Proposta</dt><dd><span class="ma-cat">minuteria proposta (non confermata): non è un'esenzione dal 2D</span></dd>{{end}}
+    </dl>
+    {{if eq $n.Classificazione.Categoria "commerciale"}}<p class="ma-nota">Commerciale: non è un'esenzione dal 2D (R103 C). Se il 2D serve lo dicono le voci dei Documenti.</p>{{end}}
+  </details>
+
+  <details class="ma-sez" data-ma-ricorda="sez-posizione" open>
+    <summary><h3 class="ma-sez-t">Posizione</h3></summary>
+    {{template "ma_posizione" (arr $v $p $g $n)}}
+  </details>
+
+  <details class="ma-sez" data-ma-ricorda="sez-disegni">
+    <summary><h3 class="ma-sez-t">Disegni 2D</h3></summary>
+    {{template "ma_disegni" (arr $v $n.Disegni)}}
+    {{with $n.Associazione}}<p class="ma-muto">Associazione del 2D principale, da: {{etichetta "origine_dato" .}}</p>{{end}}
+  </details>
+
+  <details class="ma-sez" data-ma-ricorda="sez-motivi">
+    <summary><h3 class="ma-sez-t">Motivi{{with $n.Motivi}} ({{len .}}){{end}}</h3></summary>
+    {{if $n.Motivi}}<p class="ma-riga-stato">{{range $n.Motivi}}<span class="ma-motivo" title="motivo_smistamento = {{.}}">{{etichetta "motivo_smistamento" .}}</span> {{end}}</p>{{else}}<p class="ma-muto">Nessun motivo dello smistamento sul nodo.</p>{{end}}
+  </details>
+
+  <details class="ma-sez ma-sez-gesti" data-ma-ricorda="sez-gesti" open>
+    <summary><h3 class="ma-sez-t">Gesti</h3></summary>
+    {{template "ma_gesti_nodo" (arr $v $p $g $n)}}
+  </details>
+</section>
+{{end}}
+
+{{/* Il palco: il disegno principale del nodo (pdf.js, pagina 1, larga quanto il pannello). Prima del palco «Apri il
+   visore» (il primo elemento dopo il titolo, §7.3). Senza un 2D, o senza un'anteprima disponibile, lo dice. */}}
+{{define "ma_palco"}}{{$n := index . 1}}
+{{with $n.Disegni.Primario}}{{$an := .Anteprima}}
+  {{if and $an.Disponibile $an.AllegatoID $an.Sha256}}
+  <div class="ma-palco-barra">
+    <button type="button" class="ma-btn ma-btn--sm" data-ma-azione="pdf" data-ma-visore data-ma-allegato="{{$an.AllegatoID}}" data-ma-sha="{{$an.Sha256}}" data-ma-file="{{.NomeFile}}">{{template "ma_ic" "eye"}} Apri il visore</button>
+    <span class="ma-mono ma-palco-file" data-ma-palco-file>{{.NomeFile}}</span>
+    {{template "ma_st" (arr "validita_2d" .Validita)}}
+    <span class="ma-muto ma-piccolo" data-ma-pagine></span>
+  </div>
+  <div class="ma-palco" data-ma-palco data-ma-allegato="{{$an.AllegatoID}}" data-ma-sha="{{$an.Sha256}}" data-ma-file="{{.NomeFile}}"><p class="ma-palco-testo">Il disegno si apre quando la casella è scelta.</p></div>
+  {{else}}
+  <div class="ma-palco-barra"><span class="ma-mono ma-palco-file">{{.NomeFile}}</span> {{template "ma_st" (arr "validita_2d" .Validita)}}</div>
+  <div class="ma-palco ma-palco--vuoto" data-ma-palco><p class="ma-palco-testo">anteprima non disponibile</p></div>
+  {{end}}
+{{else}}
+  <div class="ma-palco ma-palco--vuoto" data-ma-palco><p class="ma-palco-testo">nessun 2D associato al nodo</p></div>
+{{end}}
+{{end}}
+
+{{/* Principale e alternativi: un alternativo scelto si mostra SOLO nel palco (aria-pressed e la sua revisione);
+   il principale non cambia: per quello c'è «Sostituisci», che è un gesto. */}}
+{{define "ma_alt_strip"}}{{$n := index . 1}}
+{{if $n.Disegni.Alternativi}}
+<div class="ma-alt-strip" role="group" aria-label="Disegno da mostrare">
+  {{with $n.Disegni.Primario}}{{template "ma_alt" (arr . true "principale")}}{{end}}
+  {{range $n.Disegni.Alternativi}}{{template "ma_alt" (arr . false "alternativo")}}{{end}}
+</div>
+{{end}}
+{{end}}
+
+{{/* Un pulsante della striscia: acceso solo con un'anteprima disponibile */}}
+{{define "ma_alt"}}{{$x := index . 0}}{{$su := index . 1}}{{$ruolo := index . 2}}{{$an := $x.Anteprima}}
+<button type="button" class="ma-alt" data-ma-azione="disegno" aria-pressed="{{if $su}}true{{else}}false{{end}}"
+        data-ma-rev="{{template "ma_rev_chiave" $x}}" data-ma-file="{{$x.NomeFile}}"
+        {{if and $an.Disponibile $an.AllegatoID $an.Sha256}}data-ma-allegato="{{$an.AllegatoID}}" data-ma-sha="{{$an.Sha256}}"{{else}}disabled title="anteprima non disponibile"{{end}}>
+  {{template "ma_mini" (arr $an $x.NomeFile "alt")}}<span class="ma-alt-t"><span class="ma-mono">{{$x.NomeFile}}</span><small>{{$ruolo}}</small></span>
+</button>
+{{end}}
+
+{{/* La chiave della revisione di un disegno: l'allegato dell'anteprima o del disegno, altrimenti il nome del file */}}
+{{define "ma_rev_chiave"}}{{with .Anteprima.AllegatoID}}{{.}}{{else}}{{with $.AllegatoID}}{{.}}{{else}}{{$.NomeFile}}{{end}}{{end}}{{end}}
+
+{{/* La revisione del disegno mostrato (proposta, registrata, confermata, stato, discordanze) */}}
+{{define "ma_rev_disegno"}}{{$x := index . 0}}{{$nascosto := index . 1}}
+<dl class="ma-dl ma-dl--stretta ma-rev-disegno" data-ma-rev-di="{{template "ma_rev_chiave" $x}}" {{if $nascosto}}hidden{{end}}>
+  <dt>Revisione</dt><dd>
+    <span class="ma-motivo" title="proposta, fonte {{$x.RevisioneProposta.Fonte}}">proposta: {{with $x.RevisioneProposta.Valore}}{{.}}{{else}}—{{end}}{{with $x.RevisioneProposta.Fonte}} ({{etichetta "fonte_revisione" .}}){{end}}</span>
+    <span class="ma-motivo" title="registrata">registrata: {{with $x.Registrata}}{{.}}{{else}}—{{end}}{{with $x.RevProvenienza}} ({{etichetta "rev_provenienza" .}}){{end}}</span>
+    <span class="ma-motivo" title="confermata">confermata: {{with $x.Confermata}}{{.}}{{else}}—{{end}}</span>
+    {{with $x.StatoRevisione}}{{template "ma_st" (arr "stato_revisione" .)}}{{end}}
+    {{range $x.Discordanze}}<span class="ma-motivo ma-motivo--ko" title="{{.Tra}}: {{.FonteA}} contro {{.FonteB}} · {{.Effetto}}">{{etichetta "discordanza" .Tra}}: {{.A}} ≠ {{.B}}</span>{{end}}</dd>
+</dl>
+{{end}}
+
+{{/* «Nel file» e «Relazioni confermate correnti», sempre accanto (FE-05, X-05, D5 di P7e), da Indice.Legami */}}
+{{define "ma_posizione"}}{{$v := index . 0}}{{$p := index . 1}}{{$g := index . 2}}{{$n := index . 3}}{{$d := $v.Dati}}{{$leg := $d.Indice.Legami $p.Rif $g.Chiave $n.Nodo.Rif}}
+<div class="ma-posizione">
+  <div class="ma-pos-col">
+    <span class="ma-lab">Nel file</span>
+    {{if $n.Nodo.SenzaFile}}<p class="ma-muto">Nessun legame del file: è un componente confermato senza STEP.</p>
+    {{else}}{{with $leg.DelFile}}
+    {{$aperta := false}}{{range .}}{{if not .Decisa}}{{if $d.Indice.RelazioneProposta $p.Rif .Padre $n.Nodo.Rif}}{{$aperta = true}}{{end}}{{end}}{{end}}
+    {{if $aperta}}<p class="ma-nota ma-u07">La strada principale è "Conferma l'albero", dopo il riepilogo. Le decisioni nodo per nodo non rendono la BOM verificata e, prese prima del riepilogo, possono lasciarla da verificare.</p>{{end}}
+    <ul class="ma-elenco">
+      {{range .}}<li>sotto {{with $d.Indice.NodoIn $p.Rif $g.Chiave .Padre}}{{template "ma_catena" .}}{{else}}<span class="ma-mono">{{.Padre}}</span>{{end}}
+        {{with .Quantita}}<span class="ma-qta" title="quantità letta nel file">×{{.}} dal file</span>{{else}}<span class="ma-qta ma-qta--manca">qtà non letta</span>{{end}}
+        {{with .QuantitaConfermata}}<span class="ma-qta ma-qta--conf" title="quantità della relazione confermata">✓×{{.}} confermata</span>{{end}}
+        {{if .Decisa}}<span class="ma-st ma-st--ok ma-st--sm">legame confermato</span>{{else}}<span class="ma-st ma-st--prop ma-st--sm">da confermare</span>
+        {{template "ma_gesti_relazione" (arr $v $p $n .Padre)}}{{end}}
+      </li>{{end}}
+    </ul>
+    {{else}}<p class="ma-muto">Radice nel file: nessun padre.</p>{{end}}{{end}}
+  </div>
+  <div class="ma-pos-col">
+    <span class="ma-lab">Relazioni confermate correnti</span>
+    {{with $leg.Confermati}}<ul class="ma-elenco">
+      {{range .}}<li>sotto <span class="ma-cod ma-cod--conf">✓ {{.Codice}}</span> <span class="ma-qta ma-qta--conf">✓×{{.Qta}}</span>
+        {{if .NelFile}}<span class="ma-motivo">anche nel file</span>{{else}}<span class="ma-motivo">solo confermata</span>{{end}}</li>{{end}}
+    </ul>{{else}}<p class="ma-muto">nessuna</p>{{end}}
+  </div>
+  {{with $n.AncheIn}}<p class="ma-pos-anche">Anche in: {{range .}}<span class="ma-badge" title="{{.}}">{{with $d.Indice.Prodotto .}}{{or .CodiceRichiesto .Rif}}{{else}}{{.}}{{end}}</span> {{end}}</p>{{end}}
+</div>
+{{end}}
+
+{{define "ma_disegni"}}{{$v := index . 0}}{{$gr := index . 1}}
+{{with $gr.Primario}}{{template "ma_disegno" (arr $v . "principale")}}{{else}}<p class="ma-muto">Nessun disegno 2D principale.</p>{{end}}
+{{with $gr.RegolaPrimario}}<p class="ma-muto" title="regola_primario = {{.}}">Scelto come principale per: {{etichetta "regola_primario" .}}</p>{{end}}
+{{range $gr.Alternativi}}{{template "ma_disegno" (arr $v . "alternativo")}}{{template "ma_sostituisci" (arr $v $gr.Primario .)}}{{end}}
+{{range $gr.RelazioniDaConfermare}}<p class="ma-motivo" title="{{.Tipo}} · {{.Stato}}">relazione da confermare fra due disegni: {{etichetta "relazione_disegni" .Tipo}}</p>{{end}}
+{{end}}
+
+{{/* Sostituisci (contratto §3.4 C): {did} = il documento nuovo (l'alternativo), vecchio = il documento principale.
+  Solo fra due documenti: se uno dei due non è ancora un documento, il gesto è spento con il motivo. */}}
+{{define "ma_sostituisci"}}{{$v := index . 0}}{{$pri := index . 1}}{{$alt := index . 2}}{{$d := $v.Dati}}
+{{if and $pri $pri.DocumentoID $alt.DocumentoID}}
+  <form class="ma-gesto" data-ma-gesto="/thread/{{$d.ThreadID}}/fascicolo/documento/{{$alt.DocumentoID}}/sostituisci"
+        data-ma-domanda="{{$alt.NomeFile}} sostituisce {{$pri.NomeFile}} come disegno corrente? Il vecchio resta nella storia ma non è più il corrente.">
+    <fieldset {{if not $d.Scrive}}disabled{{end}}>
+      <input type="hidden" name="vecchio" value="{{$pri.DocumentoID}}">
+      <label class="ma-campo"><span>Motivo</span><input name="motivo" maxlength="200" placeholder="serve per una versione interna"></label>
+      <button class="ma-btn ma-btn--sm">{{template "ma_ic" "swap"}} Sostituisci il principale con questo</button>
+    </fieldset>
+  </form>
+{{else}}
+  {{template "ma_na" (arr "Sostituisci il principale" "Si sostituisce solo fra due documenti: questo file o il principale non è ancora un documento confermato.")}}
+{{end}}
+{{end}}
+
+{{define "ma_disegno"}}{{$x := index . 1}}{{$ruolo := index . 2}}
+<div class="ma-disegno">
+  <div class="ma-disegno-testa"><span class="ma-ext">{{or $x.Formato $x.Estensione "2D"}}</span><b class="ma-mono">{{$x.NomeFile}}</b> <span class="ma-muto">{{$ruolo}}</span>
+    {{if and $x.Anteprima.Disponibile $x.Anteprima.Sha256}}{{with $x.Anteprima.AllegatoID}}<button type="button" class="ma-btn ma-btn--sm" data-ma-azione="pdf" data-ma-allegato="{{.}}" data-ma-sha="{{$x.Anteprima.Sha256}}" data-ma-file="{{$x.NomeFile}}">{{template "ma_ic" "eye"}} Apri il visore</button>{{else}}<span class="ma-muto">anteprima non disponibile (nessun allegato)</span>{{end}}{{else}}<span class="ma-muto">anteprima non disponibile</span>{{end}}
+  </div>
+  <dl class="ma-dl ma-dl--stretta">
+    <dt>Validità</dt><dd>{{template "ma_st" (arr "validita_2d" $x.Validita)}}{{with $x.MotivoValidita}} <span class="ma-motivo" title="motivo_fabbisogno = {{.}}">{{etichetta "motivo_fabbisogno" .}}</span>{{end}}</dd>
+    <dt>Provenienza</dt><dd>{{template "ma_st" (arr "origine_dato" $x.Provenienza)}}{{if $x.Corrente}} <span class="ma-motivo">corrente</span>{{end}}</dd>
+    <dt>Cartiglio</dt><dd>{{with $x.Cartiglio}}<span title="cartiglio = {{.}}">{{etichetta "cartiglio" .}}</span>{{else}}—{{end}}{{with $x.Codice}} · codice <span class="ma-mono">{{.}}</span>{{end}}</dd>
+    <dt>sha256</dt><dd><span class="ma-mono ma-rif-tecnico" title="{{$x.Sha256}}">{{$x.Sha256}}</span></dd>
+  </dl>
+</div>
+{{end}}
+
+{{/* Accetta o scarta un legame del file: gli argomenti da Indice.RelazioneProposta (il padre da Legami.DelFile).
+   Senza una riga aperta, nessun gesto da qui. */}}
+{{define "ma_gesti_relazione"}}{{$v := index . 0}}{{$p := index . 1}}{{$n := index . 2}}{{$padre := index . 3}}{{$d := $v.Dati}}{{$s := $d.Scrive}}
+{{with $d.Indice.RelazioneProposta $p.Rif $padre $n.Nodo.Rif}}
+  <span class="ma-gesti-linea">
+  <form class="ma-gesto" data-ma-gesto="/thread/{{$d.ThreadID}}/fascicolo/relazione/accetta"><fieldset {{if not $s}}disabled{{end}}>
+    <input type="hidden" name="allegato" value="{{.Allegato}}"><input type="hidden" name="padre" value="{{.Padre}}"><input type="hidden" name="figlio" value="{{.Figlio}}">
+    <button class="ma-btn ma-btn--sm">Accetta il legame</button></fieldset></form>
+  <form class="ma-gesto" data-ma-gesto="/thread/{{$d.ThreadID}}/fascicolo/relazione/scarta" data-ma-domanda="Scartare il legame proposto? Il legame non entra nella BOM."><fieldset {{if not $s}}disabled{{end}}>
+    <input type="hidden" name="allegato" value="{{.Allegato}}"><input type="hidden" name="padre" value="{{.Padre}}"><input type="hidden" name="figlio" value="{{.Figlio}}">
+    <button class="ma-btn ma-btn--sm ma-btn--danger">Scarta il legame</button></fieldset></form>
+  </span>
+{{else}}
+  <span class="ma-muto ma-piccolo" title="Indice.RelazioneProposta = nil (nessuna riga aperta, o più di un file)">nessuna proposta aperta per questo legame</span>
+{{end}}
+{{end}}
+
+{{/* I gesti del pezzo (contratto §3.4 B), con gli ID del §1.9: RigaLegacy.ID per accetta/scarta/codice; RigaDecisa.ID
+  per riapri; il componente della casella ($cid, come in ma_li: Decisione.ComponenteID, o il componente del prodotto
+  per la radice della BOM di lavoro, contratto E3, T-A1d-22) per componente/{cid}/…; RigaDecisa.ComponenteID per
+  ripristina (un archiviato non ha la Decisione). I tre difetti corretti: qta obbligatoria e mai scritta; «Da» dalle
+  relazioni confermate correnti; «Rev e descrizione» solo con la descrizione registrata. */}}
+{{define "ma_gesti_nodo"}}{{$v := index . 0}}{{$p := index . 1}}{{$g := index . 2}}{{$n := index . 3}}{{$d := $v.Dati}}{{$s := $d.Scrive}}{{$t := $d.ThreadID}}
+{{$cidTarget := ""}}{{with $p.ComponenteID}}{{$cidTarget = .String}}{{end}}
+{{$cid := ""}}{{$cod := ""}}{{with $n.Nodo.Decisione}}{{$cid = .ComponenteID}}{{$cod = .Codice}}{{else}}{{if and (eq $g.Tipo "bom") (eq $n.Nodo.Rif $g.Radice)}}{{with $d.Indice.Componente $p.ComponenteID}}{{$cid = .ID}}{{$cod = .Codice}}{{end}}{{end}}{{end}}
+<div class="ma-gesti">
+{{if or $n.Nodo.RigaLegacy $cid}}<p class="ma-nota ma-u07">La strada principale è "Conferma l'albero", dopo il riepilogo. Le decisioni nodo per nodo non rendono la BOM verificata e, prese prima del riepilogo, possono lasciarla da verificare.</p>{{end}}
+{{with $n.Nodo.RigaLegacy}}
+  <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/nodo/{{.ID}}/accetta">
+    <fieldset {{if not $s}}disabled{{end}}>
+      <label class="ma-campo"><span>Tipo</span>
+        <select name="tipo">
+          <option value="">come proposto dalla riga</option>
+          <option value="finito">{{etichetta "tipo_componente" "finito"}}</option>
+          <option value="sottoassieme">{{etichetta "tipo_componente" "sottoassieme"}}</option>
+          <option value="sciolto">{{etichetta "tipo_componente" "sciolto"}}</option>
+        </select></label>
+      <button class="ma-btn ma-btn--pri">{{template "ma_ic" "check"}} Accetta il nodo</button>
+    </fieldset>
+    <small class="ma-muto">Crea o ritrova il componente. Non conferma l'albero e non mette il legame con il padre.</small>
+  </form>
+  <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/nodo/{{.ID}}/codice">
+    <fieldset {{if not $s}}disabled{{end}}>
+      <label class="ma-campo"><span>Codice</span><input name="codice" required autocomplete="off" spellcheck="false" value="{{with .CodiceManuale}}{{.}}{{end}}"></label>
+      <label class="ma-campo ma-campo--corto"><span>Rev</span><input name="rev" autocomplete="off" value="{{with .RevManuale}}{{.}}{{end}}"></label>
+      <button class="ma-btn">Correggi il codice</button>
+    </fieldset>
+    <small class="ma-muto">La rev si manda sempre: un campo vuoto cancella quella che c'è.</small>
+  </form>
+  <div class="ma-gesti-pericolo">
+    <button type="button" class="ma-btn ma-btn--danger" data-ma-gesto="/thread/{{$t}}/fascicolo/nodo/{{.ID}}/scarta"
+            data-ma-domanda="Scartare il nodo {{template "ma_catena_testo" $n}}? Lo scarto è definitivo: la proposta esce dalla BOM di lavoro; i figli non vengono scartati."
+            {{if not $s}}disabled{{end}}>Scarta il nodo</button>
+  </div>
+{{end}}
+{{with $n.Nodo.RigaDecisa}}{{if eq .Stato "scartata"}}
+  <button type="button" class="ma-btn" data-ma-gesto="/thread/{{$t}}/fascicolo/nodo/{{.ID}}/riapri" {{if not $s}}disabled{{end}}>Riapri il nodo</button>
+{{end}}
+  {{with .ComponenteID}}{{with $d.Indice.Componente .}}{{if .Archiviato}}
+  <div class="ma-gesto">
+    <button type="button" class="ma-btn" data-ma-gesto="/thread/{{$t}}/fascicolo/componente/{{.ID}}/ripristina" {{if not $s}}disabled{{end}}>{{template "ma_ic" "refresh"}} Ripristina il componente</button>
+    <small class="ma-muto">{{.Codice}} è archiviato: «Ripristina» lo rimette nella BOM di lavoro con la sua storia.</small>
+  </div>
+  {{end}}{{end}}{{end}}
+{{end}}
+{{if $cid}}{{$codice := $cod}}{{$leg := $d.Indice.Legami $p.Rif $g.Chiave $n.Nodo.Rif}}{{$k := $d.Indice.Componente $cid}}
+  {{if eq $cid.String $cidTarget}}
+    {{template "ma_na" (arr "Correggi il codice del componente" "Spenta: è il prodotto della RFQ; la rinomina del prodotto non si fa da questa pagina (DB7-3).")}}
+  {{else}}
+  <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/componente/{{$cid}}/codice"
+        data-ma-domanda="Cambiare il codice del componente {{$codice}}? Cambia anche sui documenti non ancora copiati.">
+    <fieldset {{if not $s}}disabled{{end}}>
+      <label class="ma-campo"><span>Nuovo codice</span><input name="codice" required autocomplete="off" spellcheck="false"></label>
+      <button class="ma-btn">Correggi il codice del componente</button>
+    </fieldset>
+  </form>
+  {{end}}
+  {{/* «Rev e descrizione» scrive sempre tutti e due i campi: acceso e precompilato solo con la descrizione registrata
+     del componente (Indice.Componente, ELENCO §4 punto 6); NodoBOM.Descrizione può venire dallo STEP. */}}
+  {{if and $k $k.Descrizione}}
+  <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/componente/{{$cid}}/modifica">
+    <fieldset {{if not $s}}disabled{{end}}>
+      <label class="ma-campo ma-campo--corto"><span>Rev</span><input name="rev" maxlength="10" autocomplete="off" value="{{with $k.Rev}}{{.}}{{end}}"></label>
+      <label class="ma-campo"><span>Descrizione</span><input name="descrizione" maxlength="200" autocomplete="off" value="{{with $k.Descrizione}}{{.}}{{end}}"></label>
+      <button class="ma-btn">Salva rev e descrizione</button>
+    </fieldset>
+    <small class="ma-muto">Si mandano sempre tutti e due: un campo svuotato cancella quello registrato.</small>
+  </form>
+  {{else}}
+    {{template "ma_na" (arr "Salva rev e descrizione" "Spento: la descrizione registrata del componente non c'è; quella mostrata può venire dallo STEP e il gesto la riscriverebbe.")}}
+  {{end}}
+  <form class="ma-gesto" data-ma-azione="tipo" data-ma-componente="{{$cid}}" data-ma-codice="{{$codice}}">
+    <fieldset {{if not $s}}disabled{{end}}>
+      <label class="ma-campo"><span>Tipo nuovo</span>
+        <select name="tipo" required>
+          <option value="" disabled selected>scegli</option>
+          <option value="finito">{{etichetta "tipo_componente" "finito"}}</option>
+          <option value="sottoassieme">{{etichetta "tipo_componente" "sottoassieme"}}</option>
+          <option value="sciolto">{{etichetta "tipo_componente" "sciolto"}}</option>
+          <option value="commerciale">{{etichetta "tipo_componente" "commerciale"}}</option>
+        </select></label>
+      <button class="ma-btn">Vedi l'effetto del cambio…</button>
+    </fieldset>
+  </form>
+  <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/componente/{{$cid}}/collega">
+    <fieldset {{if not $s}}disabled{{end}}>
+      <label class="ma-campo"><span>Sotto il padre</span>
+        <select name="padre" required><option value="" disabled selected>scegli</option>{{template "ma_opzioni_componenti" (arr $v $p $cid.String)}}</select></label>
+      <label class="ma-campo ma-campo--corto"><span>Qtà</span><input name="qta" type="number" required min="1" step="1" inputmode="numeric"></label>
+      <button class="ma-btn">{{template "ma_ic" "link"}} Collega</button>
+    </fieldset>
+    <small class="ma-muto">Scrivi la quantità: non c'è un valore già messo. Su un legame che c'è già, Collega cambia la quantità.</small>
+  </form>
+  {{/* Sposta (FE-08): «Da» = una relazione confermata corrente (Legami.Confermati), mai Parentela.Decisa; senza
+     relazioni il pezzo è una radice. «A»: un componente o «— diventa radice» (RAC-16), mai preselezionato. Lo stesso
+     gesto parte trascinando la casella nello schema (chiede conferma, stessi campi). */}}
+  <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/componente/{{$cid}}/sposta">
+    <fieldset {{if not $s}}disabled{{end}}>
+      {{with $leg.Confermati}}
+      <label class="ma-campo"><span>Da</span><select name="da" required><option value="" disabled selected>scegli</option>
+        {{range .}}<option value="{{.PadreID}}">{{.Codice}} ✓×{{.Qta}}{{if .NelFile}} · anche nel file{{end}}</option>{{end}}</select></label>
+      {{else}}
+      <input type="hidden" name="da" value=""><span class="ma-campo ma-campo--testo">Da: la radice (nessuna relazione confermata)</span>
+      {{end}}
+      <label class="ma-campo"><span>A</span><select name="a" required><option value="" disabled selected>scegli</option><option value="">— diventa radice</option>{{template "ma_opzioni_componenti" (arr $v $p $cid.String)}}</select></label>
+      <label class="ma-campo ma-campo--corto"><span>Qtà</span><input name="qta" type="number" required min="1" step="1" inputmode="numeric"></label>
+      <button class="ma-btn">Sposta</button>
+    </fieldset>
+    <small class="ma-muto">Scrivi la quantità: non c'è un valore già messo.</small>
+  </form>
+  {{range $leg.Confermati}}
+  <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/componente/{{$cid}}/scollega"
+        data-ma-domanda="Togliere {{$codice}} da sotto {{.Codice}}? Il componente resta; se non ha altri padri diventa una radice.">
+    <fieldset {{if not $s}}disabled{{end}}><input type="hidden" name="padre" value="{{.PadreID}}">
+      <button class="ma-btn ma-btn--sm">Scollega da {{.Codice}}</button></fieldset>
+  </form>
+  {{end}}
+  <div class="ma-gesti-pericolo">
+    <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/componente/{{$cid}}/archivia"
+          data-ma-domanda="Archiviare {{$codice}}? Esce dalla BOM di lavoro con i suoi legami; documenti, proposte e storia restano.">
+      <fieldset {{if not $s}}disabled{{end}}>
+        <label class="ma-campo"><span>Motivo</span><input name="motivo" required maxlength="200"></label>
+        <button class="ma-btn ma-btn--danger">Archivia</button>
+      </fieldset>
+    </form>
+    <button type="button" class="ma-btn ma-btn--danger" data-ma-gesto="/thread/{{$t}}/fascicolo/componente/{{$cid}}/rimuovi"
+            data-ma-domanda="Rimuovere del tutto {{$codice}}? Il componente e i suoi legami spariscono e non si recuperano. Riesce solo se non ha storia; altrimenti usa «Archivia»."
+            {{if not $s}}disabled{{end}}>Rimuovi</button>
+  </div>
+{{end}}
+{{if and (not $n.Nodo.RigaLegacy) (not $cid) (not $n.Nodo.RigaDecisa)}}
+  <p class="ma-muto">Il nodo non è ancora un componente e non ha una proposta aperta: nessun gesto possibile da qui.</p>
+{{end}}
+</div>
+{{end}}
+
+{{/* I componenti confermati del prodotto, per i menu: prima il componente del prodotto (contratto §1.4 «il componente
+   del target per primo»; con la BOM di lavoro è la radice, che non ha una Decisione propria, E3), da Indice.Componente;
+   poi ComponenteID e codice dalla Decisione dei nodi e dei confermati senza STEP, senza ripetere il prodotto. Prende
+   (arr $v $p $escludi). Un componente in due nodi compare due volte (innocuo: stesso valore). */}}
+{{define "ma_opzioni_componenti"}}{{$v := index . 0}}{{$p := index . 1}}{{$escludi := index . 2}}{{$d := $v.Dati}}
+{{$target := ""}}{{with $p.ComponenteID}}{{$target = .String}}{{with $d.Indice.Componente .}}{{if ne .ID.String $escludi}}<option value="{{.ID}}">{{.Codice}}{{with .Rev}} rev {{.}}{{end}} · il prodotto</option>{{end}}{{end}}{{end}}
+{{range $p.Nodi}}{{with .Nodo.Decisione}}{{if and (ne .ComponenteID.String $escludi) (ne .ComponenteID.String $target)}}<option value="{{.ComponenteID}}">{{.Codice}}{{with .Rev}} rev {{.}}{{end}}</option>{{end}}{{end}}{{end}}
+{{range $p.ConfermatiSenzaSTEP}}{{with .Nodo.Decisione}}{{if and (ne .ComponenteID.String $escludi) (ne .ComponenteID.String $target)}}<option value="{{.ComponenteID}}">{{.Codice}}{{with .Rev}} rev {{.}}{{end}}</option>{{end}}{{end}}{{end}}
+{{end}}
+
+{{/* «Associa a…» di un file da smistare (difetto 3, FE-10, T-A1d-FE-06): i componenti dei prodotti DEL FILE
+   (Prodotti, «del file»), poi quelli del messaggio (ProdottiContesto, «dal messaggio»); senza prodotti, quelli del
+   prodotto scelto, con l'avviso. Nessuna opzione selezionata salvo il segnaposto spento. */}}
+{{define "ma_opzioni_per_file"}}{{$v := index . 0}}{{$f := index . 1}}{{$p := index . 2}}{{$d := $v.Dati}}
+{{range $f.Prodotti}}{{with $d.Indice.Prodotto .}}<optgroup label="del file · {{or .CodiceRichiesto .Rif}}">{{template "ma_opzioni_componenti" (arr $v . "")}}</optgroup>{{end}}{{end}}
+{{range $f.ProdottiContesto}}{{with $d.Indice.Prodotto .}}<optgroup label="dal messaggio · {{or .CodiceRichiesto .Rif}}">{{template "ma_opzioni_componenti" (arr $v . "")}}</optgroup>{{end}}{{end}}
+{{if not (or $f.Prodotti $f.ProdottiContesto)}}<optgroup label="prodotto scelto (il file non ha prodotti) · {{or $p.CodiceRichiesto $p.Rif}}">{{template "ma_opzioni_componenti" (arr $v $p "")}}</optgroup>{{end}}
+{{end}}
+
+{{/* ================================================================ R7 conflitti (e R10 per lo smistamento)
+  "struttura" = tutti tranne lo smistamento (qui, con i gesti delle rimozioni); "smistamento" = solo quelli dello
+  smistamento (nel riepilogo). Li dà Indice.Conflitti (C-21, D-PF-15): nessun conflitto compare in due posti. */}}
+
+{{define "ma_conflitti"}}{{$v := index . 0}}{{$p := index . 1}}{{$quali := index . 2}}{{$d := $v.Dati}}{{$s := $d.Scrive}}{{$elenco := $d.Indice.Conflitti $p.Rif $quali}}
+<details class="ma-fs ma-conflitti" id="ma-conflitti-{{$quali}}" {{if $elenco}}open{{end}}>
+  <summary><h2>Conflitti {{if eq $quali "smistamento"}}dello smistamento{{else}}della struttura{{end}} ({{len $elenco}})</h2></summary>
+  {{with $elenco}}
+  <div class="ma-scorre ma-wrap-tb"><table class="ma-tabella">
+    <thead><tr><th scope="col">Tipo</th><th scope="col">Asse</th><th scope="col">Su</th><th scope="col">Decisione</th><th scope="col">Proposta</th><th scope="col">Motivo</th><th scope="col">Gesti</th></tr></thead>
+    <tbody>
+    {{range .}}
+      <tr>
+        <td>{{template "ma_st" (arr "tipo_conflitto" .Tipo)}}</td>
+        <td title="asse = {{.Asse}}">{{etichetta "asse_conflitto" .Asse}}</td>
+        <td>{{with $d.Indice.Nodo $p.Rif .Rif}}{{template "ma_catena" .}}{{else}}{{with $d.Indice.Prodotto .Rif}}<span class="ma-mono" title="{{.Rif}}">{{or .CodiceRichiesto "il prodotto"}}</span>{{else}}{{with $d.Indice.Componente .Rif}}<span class="ma-mono" title="componente {{.ID}}">{{.Codice}}</span>{{else}}<span class="ma-muto" title="riferimento calcolato, non è un ID: {{.Rif}}">riferimento tecnico</span>{{end}}{{end}}{{end}}</td>
+        <td><span class="ma-mono">{{.Decisione}}</span> {{with .OrigineDecisione}}<span class="ma-motivo" title="origine_decisione = {{.}}">{{etichetta "origine_dato" .}}</span>{{end}}
+          {{with .EvidenzaDecisione.Il}}<span class="ma-muto">{{oraLunga .}}</span>{{end}}</td>
+        <td><span class="ma-mono">{{.Proposta}}</span>{{with .EvidenzaProposta.AllegatoID}} <span class="ma-muto">da {{with $d.Indice.NomeFile .}}{{.}}{{else}}file {{uuidBreve .}}{{end}}</span>{{end}}
+          {{with .EvidenzaProposta.Evidenza.Valore}}<span class="ma-muto">«{{.}}»</span>{{end}}</td>
+        <td>{{with .Motivo}}<span title="motivo = {{.}}">{{etichetta "motivo_conflitto" .}}</span>{{end}}</td>
+        <td>{{if and (eq .Tipo "arco") (eq .Motivo "rimozione")}}{{with $d.Indice.Rimozione .}}
+          <span class="ma-gesti-linea">
+          <form class="ma-gesto" data-ma-gesto="/thread/{{$d.ThreadID}}/fascicolo/rimozione/accetta" data-ma-domanda="Togliere questo legame dalla BOM di lavoro? Lo STEP autorizzato non lo contiene più."><fieldset {{if not $s}}disabled{{end}}>
+            <input type="hidden" name="step" value="{{.Step}}"><input type="hidden" name="padre" value="{{.Padre}}"><input type="hidden" name="figlio" value="{{.Figlio}}">
+            <button class="ma-btn ma-btn--sm ma-btn--danger">Accetta la rimozione</button></fieldset></form>
+          <form class="ma-gesto" data-ma-gesto="/thread/{{$d.ThreadID}}/fascicolo/rimozione/scarta"><fieldset {{if not $s}}disabled{{end}}>
+            <input type="hidden" name="step" value="{{.Step}}"><input type="hidden" name="padre" value="{{.Padre}}"><input type="hidden" name="figlio" value="{{.Figlio}}">
+            <button class="ma-btn ma-btn--sm">Scarta la rimozione (il legame resta)</button></fieldset></form>
+          </span>
+          {{else}}<span class="ma-muto ma-piccolo" title="Indice.Rimozione = nil (la chiave non è nella fotografia del thread)">Gesto non disponibile: manca la chiave della rimozione.</span>{{end}}{{end}}</td>
+      </tr>
+    {{end}}
+    </tbody>
+  </table></div>
+  {{else}}<p class="ma-vuoto">Nessun conflitto {{if eq $quali "smistamento"}}dello smistamento{{else}}della struttura{{end}} nell'esito per questo prodotto.</p>{{end}}
+</details>
+{{end}}
+
+{{/* ================================================================ R8 da smistare (tutta la RFQ)
+  Una scheda per file: miniatura, nome, il motivo e ACCANTO la disponibilità (due dati, nessuna precedenza), il
+  contesto del file, i gesti. «Conferma il documento» con UNA voce; «Associa a…» con un pulsante esplicito. */}}
+{{define "ma_da_smistare"}}{{$v := index . 0}}{{$p := index . 1}}{{$d := $v.Dati}}{{$s := $d.Scrive}}{{$t := $d.ThreadID}}
+<section class="ma-fs ma-ws-smistare" id="ma-da-smistare" aria-labelledby="ma-ds-t">
+  <header>{{template "ma_ic" "folder"}}<h2 id="ma-ds-t">Da smistare</h2><span class="ma-k3 ma-piccolo">tutta la RFQ</span><span class="ma-sp"></span><span class="ma-k3">{{len $d.Esito.DaSmistare}}</span></header>
+  {{with $d.Esito.DaSmistare}}
+  {{range $i, $f := .}}{{$a := $f.AllegatoID}}{{$nome := $f.NomeFile}}
+    <article class="ma-pick" aria-label="File {{$nome}}" data-ma-allegato="{{$a}}">
+      {{template "ma_mini" (arr ($d.Indice.Anteprima $a) $nome "riga")}}
+      <div class="ma-pick-corpo">
+        <span class="ma-fn" title="{{$nome}}">{{$nome}}</span>
+        <span class="ma-pick-segni">{{if $f.Orfano}}<span class="ma-badge ma-badge--ver" title="orfano = true">orfano</span>{{end}}{{with $d.Indice.Badge $a}}{{template "ma_badge" .}}{{end}}</span>
+        <span class="ma-pick-stati"><span class="ma-pick-k">motivo</span>{{template "ma_st" (arr "motivo_smistamento" $f.Motivo)}}
+          <span class="ma-pick-k">file</span>{{with $d.Indice.File $a}}{{template "ma_st" (arr "disponibilita" .Disponibilita)}}{{with .Motivo}} <span class="ma-motivo" title="motivo del file = {{.}}">{{etichetta "motivo_file" .}}</span>{{end}}{{else}}<span class="ma-st ma-st--na" title="il file non è nell'esito">—</span>{{end}}</span>
+        {{template "ma_contesto_file" (arr $v $f)}}
+      </div>
+      <div class="ma-pick-gesti">
+      {{with $d.Indice.PropostaAperta $a}}{{$pid := .}}
+        <button type="button" class="ma-btn ma-btn--sm ma-btn--pri" data-ma-gesto="/thread/{{$t}}/fascicolo/conferma" data-ma-campi='{"voce":"{{$pid}}"}' aria-label="Conferma il documento {{$nome}}"
+                data-ma-domanda="Confermare {{$nome}} con il tipo e il componente che propone? {{if $p.BOM.Verificata}}La copia sul NAS parte subito.{{else}}La copia sul NAS parte subito; la struttura non è ancora verificata.{{end}}"
+                {{if not $s}}disabled{{end}}>{{template "ma_ic" "check"}} Conferma il documento</button>
+        <button type="button" class="ma-btn ma-btn--sm" data-ma-azione="ispeziona" data-ma-cassetto="ma-ds-{{$i}}" aria-label="Associa a… (file {{$nome}})">{{template "ma_ic" "link"}} Associa a…</button>
+        <button type="button" class="ma-btn ma-btn--sm ma-btn--danger" data-ma-gesto="/proposta/{{$pid}}/scarta" aria-label="Scarta il file {{$nome}}" title="Lo scarto del file è definitivo (DB7-8)."
+                data-ma-domanda="Scartare il file {{$nome}}? Lo scarto è definitivo: nessun gesto lo riporta indietro." {{if not $s}}disabled{{end}}>Scarta il file</button>
+        <dialog class="ma-finestra ma-dialogo ma-dialogo--cassetto" id="ma-ds-{{$i}}" aria-label="Associa {{$nome}} a un componente">
+          <div class="ma-dialogo-guscio">
+            <header class="ma-dialogo-testa"><div><span class="ma-lab">Associa a un componente</span><h2 class="ma-mono">{{$nome}}</h2></div>
+              <button type="button" class="ma-btn ma-btn--sm ma-btn--ghost" data-ma-azione="chiudi-dialogo" aria-label="Chiudi">{{template "ma_ic" "x"}}</button></header>
+            <div class="ma-dialogo-corpo">
+              {{template "ma_mini" (arr ($d.Indice.Anteprima $a) $nome "grande")}}
+              {{template "ma_contesto_file" (arr $v $f)}}
+              <p class="ma-hint">Scegli il componente. L'associazione è a mano e non è una conferma. Il file resta da confermare.</p>
+              {{if not (or $f.Prodotti $f.ProdottiContesto)}}<p class="ma-nota--ver">Il file non ha prodotti, né del file né dal messaggio: qui ci sono i componenti del prodotto scelto.</p>{{end}}
+              <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/assegna"><fieldset {{if not $s}}disabled{{end}}>
+                <input type="hidden" name="proposta" value="{{$pid}}">
+                <label class="ma-campo ma-campo--largo"><span>Componente</span><select name="componente" required><option value="" disabled selected>scegli il componente</option>{{template "ma_opzioni_per_file" (arr $v $f $p)}}</select></label>
+                <button class="ma-btn ma-btn--sm ma-btn--pri">{{template "ma_ic" "link"}} Associa a questo componente</button></fieldset>
+                <small class="ma-muto">Associazione a mano, non confermata.</small></form>
+            </div>
+            <div class="ma-dialogo-piede"><button type="button" class="ma-btn ma-btn--ghost" data-ma-azione="chiudi-dialogo">Chiudi</button></div>
+          </div>
+        </dialog>
+      {{else}}
+        <span class="ma-muto ma-piccolo" title="Indice.PropostaAperta = nil (nessuna proposta aperta nella fotografia del thread)">Nessuna proposta aperta per questo file: da qui non c'è un gesto.</span>
+      {{end}}
+      </div>
+    </article>
+  {{end}}
+  {{else}}<p class="ma-hint">Nessun file da smistare nell'esito.</p>{{end}}
+</section>
+{{end}}
+
+{{/* Il contesto di un file: «del file» (Prodotti), «dal messaggio» (ProdottiContesto), l'associazione; nei dettagli
+   pertinenza, pertinenza dal contesto e prodotti del messaggio, dati distinti (R106 B, R107, F0-18). */}}
+{{define "ma_contesto_file"}}{{$v := index . 0}}{{$f := index . 1}}{{$d := $v.Dati}}
+<div class="ma-contesto">
+  <span><span class="ma-pick-k">del file</span>{{range $f.Prodotti}}<span class="ma-badge" title="{{.}}">{{with $d.Indice.Prodotto .}}{{or .CodiceRichiesto .Rif}}{{else}}{{.}}{{end}}</span> {{else}}<span class="ma-muto">—</span>{{end}}</span>
+  <span><span class="ma-pick-k">dal messaggio</span>{{range $f.ProdottiContesto}}<span class="ma-badge ma-badge--prop" title="{{.}}">{{with $d.Indice.Prodotto .}}{{or .CodiceRichiesto .Rif}}{{else}}{{.}}{{end}}</span> {{else}}<span class="ma-muto">—</span>{{end}}</span>
+  {{with $d.Indice.Associazione $f.AllegatoID}}
+  <span><span class="ma-pick-k">associazione</span>{{template "ma_st" (arr "associazione" .Associazione)}}{{with .Collocazione}} <span class="ma-motivo" title="collocazione = {{.}}">{{etichetta "collocazione" .}}</span>{{end}}
+    {{with .Manuale}}<span class="ma-motivo">a mano: {{with $d.Indice.Componente .}}{{.Codice}}{{else}}{{uuidBreve .}}{{end}}</span>{{end}}
+    {{with .Confermata}}<span class="ma-motivo">confermata: {{with $d.Indice.Componente .}}{{.Codice}}{{else}}{{uuidBreve .}}{{end}}</span>{{end}}
+    {{with .Origine}}<span class="ma-motivo" title="origine = {{.}}">da: {{etichetta "origine_dato" .}}</span>{{end}}</span>
+  <details class="ma-dettagli">
+    <summary>Dettagli dell'associazione</summary>
+    <dl class="ma-dl ma-dl--stretta">
+      <dt>Proposta</dt><dd>{{with .Proposta}}<span>{{len .}} destinazioni proposte:</span> {{range .}}<span class="ma-mono ma-motivo">{{.}}</span> {{end}}{{else}}<span class="ma-muto">—</span>{{end}}</dd>
+      <dt>Pertinente</dt><dd>{{range .Pertinente}}<span class="ma-badge" title="{{.}}">{{with $d.Indice.Prodotto .}}{{or .CodiceRichiesto .Rif}}{{else}}{{.}}{{end}}</span> {{else}}<span class="ma-muto">—</span>{{end}}</dd>
+      <dt>Pertinenza dal contesto</dt><dd>{{range .PertinenzaContesto}}<span class="ma-badge" title="{{.}}">{{with $d.Indice.Prodotto .}}{{or .CodiceRichiesto .Rif}}{{else}}{{.}}{{end}}</span> {{else}}<span class="ma-muto">—</span>{{end}}</dd>
+      <dt>Prodotti del messaggio</dt><dd>{{with .Contesto}}{{range .Prodotti}}<span class="ma-badge" title="{{.}}">{{with $d.Indice.Prodotto .}}{{or .CodiceRichiesto .Rif}}{{else}}{{.}}{{end}}</span> {{else}}<span class="ma-muto">—</span>{{end}}{{else}}<span class="ma-muto">—</span>{{end}}</dd>
+      <dt>Perimetro</dt><dd>{{template "ma_st" (arr "perimetro" .Perimetro)}}{{if .Esclusa}} <span class="ma-st ma-st--neu ma-st--sm">scartato</span>{{end}}</dd>
+    </dl>
+  </details>
+  {{end}}
+</div>
+{{end}}
+
+{{define "ma_badge"}}{{if and .Badge (ne .Badge "uguale")}}<span class="ma-badge ma-badge--{{template "ma_tono" .Badge}}" title="confronto vecchio/nuovo: {{.Badge}}{{with .Motivo}} · {{.}}{{end}}">{{etichetta "badge" .Badge}}</span>{{end}}{{end}}
+
+{{/* ================================================================ R9 riepilogo documentale (#ma-documenti)
+  Una tabella con colonne distinte: Associazione, Conferma documentale, Copia sul NAS (FE-11, T-A1d-FE-02); i
+  previsti in grigio; un solo «Riprova le copie». Con vista=documenti è evidenziato e motore_a.mjs ci porta il fuoco. */}}
+{{define "ma_documenti"}}{{$v := index . 0}}{{$p := index . 1}}{{$d := $v.Dati}}{{$cd := $p.Documenti}}{{$vista := or $d.Vista "distinta"}}
+<section class="ma-fs ma-documenti{{if eq $vista "documenti"}} ma-evidenza{{end}}" id="ma-documenti" aria-labelledby="ma-documenti-t">
+  <header class="ma-doc-testa">
+    {{template "ma_ic" "folder"}}<h2 id="ma-documenti-t" tabindex="-1">Riepilogo documentale · <span class="ma-mono">{{or $p.CodiceRichiesto $p.Rif}}</span></h2>
+    <span class="ma-sum"><span class="ma-lab">Conferma documentale</span>
+      {{template "ma_st" (arr "stato_documenti" $cd.Stato)}}
+      {{with $cd.Motivo}}<span class="ma-motivo" title="motivo = {{.}}">{{etichetta "motivo_documenti" .}}</span>{{end}}
+      {{if $cd.PerimetroChiuso}}<span class="ma-st ma-st--ok">perimetro chiuso</span>{{else}}<span class="ma-st ma-st--ver" title="motivo_perimetro = {{$cd.MotivoPerimetro}}">perimetro aperto</span>{{with $cd.MotivoPerimetro}} <span class="ma-motivo">{{etichetta "motivo_perimetro" .}}</span>{{end}}{{end}}</span>
+  </header>
+  <div class="ma-toolbar" role="group" aria-label="Gesti non ancora disponibili">
+    {{template "ma_na" (arr "Cerca di nuovo sul portale" "Non ancora disponibile: nessun codice scarica dal portale.")}}
+    {{template "ma_na" (arr "Carica a mano" "Non ancora disponibile qui: si carica dalla pagina del Fascicolo (R-06).")}}
+    {{template "ma_na" (arr "Conferma tutti i riconosciuti" "Non ancora disponibile: arriva con lo spazio di verifica, non si anticipa né si simula.")}}
+    {{template "ma_na" (arr "Conferma la minuteria" "Non ancora disponibile: la conferma della categoria arriva con lo spazio di verifica (R-08).")}}
+  </div>
+  <p class="ma-hint">Lo STEP strutturale non è un documento da confermare qui: è la fonte (conferma della fonte, sopra). Confermato non vuol dire copiato: solo «copiato sul NAS» dice che la copia è fatta.</p>
+  {{if not $p.BOM.Verificata}}<p class="ma-esito ma-esito--no">{{template "ma_ic" "alert"}}<span>La struttura non è ancora verificata: confermare un documento avvia subito la copia sul NAS.</span></p>{{end}}
+  {{if or $cd.Voci $cd.Previsti}}
+  <div class="ma-scorre ma-wrap-tb"><table class="ma-tabella ma-voci">
+    <thead><tr><th scope="col">Componente</th><th scope="col">Documento</th><th scope="col">Regola</th><th scope="col">File</th><th scope="col">Associazione</th><th scope="col">Conferma documentale</th><th scope="col">Copia sul NAS</th><th scope="col">Gesti</th></tr></thead>
+    <tbody>
+    {{range $i, $vo := $cd.Voci}}{{if $vo.DelProdotto}}{{template "ma_voce_riga" (arr $v $p $vo $i)}}{{end}}{{end}}
+    {{range $i, $vo := $cd.Voci}}{{if not $vo.DelProdotto}}{{template "ma_voce_riga" (arr $v $p $vo $i)}}{{end}}{{end}}
+    {{with $cd.Previsti}}
+      <tr class="ma-gruppo-riga ma-gruppo-riga--previsti"><th colspan="8" scope="rowgroup">Previsti, non ancora nel perimetro <span class="ma-muto">· un previsto non conta come mancante</span></th></tr>
+      {{range .}}<tr class="ma-previsto">
+        <td data-ma-lab="Componente">{{with $d.Indice.Nodo $p.Rif .Nodo}}{{template "ma_catena" .}}{{else}}<span class="ma-mono">{{.CodiceProposto}}</span>{{end}}</td>
+        <td data-ma-lab="Documento"><span title="tipo_documento = {{.TipoDocumento}}">{{etichetta "tipo_documento" .TipoDocumento}}</span></td>
+        <td data-ma-lab="Regola" title="motivo = {{.Motivo}}">{{etichetta "motivo_previsto" .Motivo}}</td>
+        <td data-ma-lab="File">{{with .Disegni}}{{with .Primario}}<span class="ma-mono ma-nome-file">{{.NomeFile}}</span>{{else}}—{{end}}{{else}}—{{end}}</td>
+        <td data-ma-lab="Associazione">—</td>
+        <td data-ma-lab="Conferma documentale"><span class="ma-st ma-st--neu ma-st--piatto" title="entra fra le voci quando il nodo entra nel perimetro">previsto</span></td>
+        <td data-ma-lab="Copia sul NAS">—</td>
+        <td data-ma-lab="Gesti"><span class="ma-muto" title="un previsto non ha gesti: entra fra le voci quando il nodo entra nel perimetro">—</span></td>
+      </tr>{{end}}
+    {{end}}
+    </tbody>
+  </table></div>
+  {{else if eq $cd.Stato "non_calcolabile"}}<p class="ma-vuoto">Nessuna voce: la completezza non si calcola ancora (vedi il motivo qui sopra).</p>
+  {{else}}<p class="ma-vuoto">Nessuna voce di fabbisogno e nessun previsto per questo prodotto nell'esito.</p>{{end}}
+  <div class="ma-doc-sotto">
+    {{template "ma_nasbox" (arr $v $p)}}
+    {{template "ma_file_a_parte" (arr $v $p)}}
+  </div>
+  {{range $i, $vo := $cd.Voci}}{{template "ma_voce_cassetto" (arr $v $p $vo $i)}}{{end}}
+</section>
+{{end}}
+
+{{/* Una voce di fabbisogno come riga (otto colonne; data-ma-lab per la scheda sotto 860 px) */}}
+{{define "ma_voce_riga"}}{{$v := index . 0}}{{$p := index . 1}}{{$vo := index . 2}}{{$i := index . 3}}{{$d := $v.Dati}}
+{{$nome := ""}}{{with $vo.Disegni}}{{with .Primario}}{{$nome = .NomeFile}}{{end}}{{end}}{{if not $nome}}{{with $vo.FileCandidato}}{{$nome = $d.Indice.NomeFile .}}{{end}}{{end}}
+<tr class="ma-voce{{if $vo.DelProdotto}} ma-voce--prodotto{{end}}" data-ma-voce="{{$vo.ComponenteID}}|{{$vo.TipoDocumento}}">
+  <td data-ma-lab="Componente"><span class="ma-mono">{{$vo.Codice}}</span>
+    {{with $vo.TipoComponente}}<span class="ma-tipo ma-tipo--{{.}}">{{etichetta "tipo_componente" .}}</span>{{end}}
+    {{if eq $vo.Categoria "minuteria"}}<span class="ma-badge" title="categoria = minuteria (confermata)">minuteria confermata</span>{{end}}</td>
+  <td data-ma-lab="Documento"><span title="tipo_documento = {{$vo.TipoDocumento}}">{{etichetta "tipo_documento" $vo.TipoDocumento}}</span></td>
+  <td class="ma-regole" data-ma-lab="Regola">{{template "ma_voce_regole" $vo}}</td>
+  <td class="ma-c-file" data-ma-lab="File">{{template "ma_voce_file" (arr $v $vo)}}</td>
+  <td class="ma-c-ass" data-ma-lab="Associazione">{{template "ma_voce_associazione" (arr $v $vo)}}</td>
+  <td class="ma-c-conf" data-ma-lab="Conferma documentale">{{template "ma_st" (arr "esito_fabbisogno" $vo.Esito)}}{{with $vo.Motivo}} <span class="ma-motivo" title="motivo_fabbisogno = {{.}}">{{etichetta "motivo_fabbisogno" .}}</span>{{end}}
+    {{if $vo.DerogaID}}<span class="ma-badge" title="deroga_id = {{$vo.DerogaID}}">derogato</span>{{end}}</td>
+  <td class="ma-c-nas" data-ma-lab="Copia sul NAS">{{template "ma_voce_nas" $vo}}</td>
+  <td class="ma-c-gesti" data-ma-lab="Gesti">
+    {{template "ma_voce_conferma" (arr $v $p $vo $nome)}}
+    <button type="button" class="ma-btn ma-btn--sm" data-ma-azione="ispeziona" data-ma-cassetto="ma-isp-{{$i}}" aria-label="Ispeziona {{etichetta "tipo_documento" $vo.TipoDocumento}} di {{$vo.Codice}}">{{template "ma_ic" "eye"}} Ispeziona</button>
+  </td>
+</tr>
+{{end}}
+
+{{/* Il file della voce: per il 2D il principale (con la miniatura vera), altrimenti il file candidato con la sua
+   disponibilità, altrimenti il documento del componente; mai un nome inventato. */}}
+{{define "ma_voce_file"}}{{$v := index . 0}}{{$vo := index . 1}}{{$d := $v.Dati}}
+<span class="ma-file">
+{{with $vo.Disegni}}{{with .Primario}}
+  {{template "ma_mini" (arr .Anteprima .NomeFile "riga")}}
+  <span class="ma-file-t"><span class="ma-mono ma-nome-file" title="{{.NomeFile}}">{{.NomeFile}}</span> {{template "ma_st" (arr "validita_2d" .Validita)}}</span>
+{{else}}<span class="ma-muto">nessun principale</span>{{end}}{{with .Alternativi}}<span class="ma-motivo">{{len .}} alternativi</span>{{end}}
+{{else}}{{with $vo.FileCandidato}}
+  {{template "ma_mini" (arr ($d.Indice.Anteprima .) ($d.Indice.NomeFile .) "riga")}}
+  <span class="ma-file-t"><span class="ma-mono ma-nome-file">{{with $d.Indice.NomeFile .}}{{.}}{{else}}file {{uuidBreve .}}{{end}}</span>
+  {{with $d.Indice.File .}}{{template "ma_st" (arr "disponibilita" .Disponibilita)}}{{end}}</span>
+{{else}}{{if $vo.DocumentoID}}<span class="ma-muto">documento del componente</span>{{else}}<span class="ma-muto">nessun file</span>{{end}}{{end}}{{end}}
+</span>
+{{end}}
+
+{{/* La colonna «Associazione» (T-A1d-FE-02): per il 2D la provenienza del principale (e «corrente»); per gli altri
+   tipi l'associazione del file candidato; con un documento e senza candidato «documento del componente». */}}
+{{define "ma_voce_associazione"}}{{$v := index . 0}}{{$vo := index . 1}}{{$d := $v.Dati}}
+{{- if eq $vo.TipoDocumento "disegno_2d"}}{{with $vo.Disegni}}{{with .Primario}}{{template "ma_st" (arr "origine_dato" .Provenienza)}}{{if .Corrente}} <span class="ma-motivo">corrente</span>{{end}}{{else}}<span class="ma-muto">—</span>{{end}}{{else}}<span class="ma-muto">—</span>{{end}}
+{{- else}}{{with $vo.FileCandidato}}{{with $d.Indice.Associazione .}}{{template "ma_st" (arr "associazione" .Associazione)}}{{with .Origine}} <span class="ma-motivo" title="origine = {{.}}">da: {{etichetta "origine_dato" .}}</span>{{end}}{{else}}<span class="ma-muto">—</span>{{end}}
+{{- else}}{{if $vo.DocumentoID}}<span class="ma-motivo">documento del componente</span>{{else}}<span class="ma-muto">—</span>{{end}}{{end}}{{end -}}
+{{end}}
+
+{{define "ma_voce_regole"}}{{$vo := .}}
+{{if $vo.Bloccante}}<span class="ma-badge" title="bloccante = true">bloccante</span>{{end}}
+{{if $vo.Invariante}}<span class="ma-badge" title="invariante = true: il 2D che le regole del cliente non tolgono">2D invariante</span>{{end}}
+{{if $vo.RegolaCliente}}<span class="ma-badge" title="regola_cliente = true">regola del cliente</span>{{end}}
+{{with $vo.NotaRegola}}<span class="ma-motivo" title="nota_regola = {{.}}">{{etichetta "nota_regola" .}}</span>{{end}}
+{{if not (or $vo.Bloccante $vo.Invariante $vo.RegolaCliente $vo.NotaRegola)}}<span class="ma-muto">—</span>{{end}}
+{{end}}
+
+{{/* La copia sul NAS, colonna sua: in coda, scritta, errore; senza stato «—» (X-07: nessun segnaposto EB7) */}}
+{{define "ma_voce_nas"}}{{with .StatoNas}}{{template "ma_st" (arr "stato_nas" .)}}{{else}}<span class="ma-muto" title="stato_nas vuoto">—</span>{{end}}{{end}}
+
+{{/* «Conferma il documento» della voce: SOLO dentro {{with PropostaAperta}}, con UNA voce (FE-12). La domanda c'è
+   sempre (la copia sul NAS parte subito e non si corregge più, D-PF-03); la frase DB7-2 solo con la BOM non verificata. */}}
+{{define "ma_voce_conferma"}}{{$v := index . 0}}{{$p := index . 1}}{{$vo := index . 2}}{{$nome := index . 3}}{{$d := $v.Dati}}
+{{with $vo.PropostaAperta}}
+  <button type="button" class="ma-btn ma-btn--sm ma-btn--pri" data-ma-gesto="/thread/{{$d.ThreadID}}/fascicolo/conferma" data-ma-campi='{"voce":"{{.}}"}' aria-label="Conferma il documento {{or $nome "senza nome"}} per {{$vo.Codice}}"
+          data-ma-domanda="Confermare {{or $nome "il file"}} per {{$vo.Codice}}? {{if $p.BOM.Verificata}}La copia sul NAS parte subito.{{else}}La copia sul NAS parte subito; la struttura non è ancora verificata.{{end}} Dopo la copia codice e documento non si correggono più."
+          {{if not $d.Scrive}}disabled{{end}}>{{template "ma_ic" "check"}} Conferma il documento</button>
+{{end}}
+{{end}}
+
+{{/* Il cassetto «Ispeziona» di una voce: file, disegni e gli altri gesti della voce (Associa, Togli dal componente,
+   Deroga o Revoca della deroga, Scarta il file). «Conferma il documento» resta sulla riga: un solo pulsante. Le tre
+   operazioni da non confondere hanno rotte, testi e domande diversi: scarto del nodo (R6), scarto documentale (qui e
+   R8), disassociazione (qui). */}}
+{{define "ma_voce_cassetto"}}{{$v := index . 0}}{{$p := index . 1}}{{$vo := index . 2}}{{$i := index . 3}}{{$d := $v.Dati}}{{$s := $d.Scrive}}{{$t := $d.ThreadID}}
+{{$nome := ""}}{{with $vo.Disegni}}{{with .Primario}}{{$nome = .NomeFile}}{{end}}{{end}}{{if not $nome}}{{with $vo.FileCandidato}}{{$nome = $d.Indice.NomeFile .}}{{end}}{{end}}
+{{$correnti := $d.Indice.Correnti $vo.ComponenteID $vo.TipoDocumento}}
+<dialog class="ma-finestra ma-dialogo ma-dialogo--cassetto" id="ma-isp-{{$i}}" aria-label="Ispeziona {{etichetta "tipo_documento" $vo.TipoDocumento}} di {{$vo.Codice}}">
+  <div class="ma-dialogo-guscio">
+    <header class="ma-dialogo-testa"><div><span class="ma-lab">{{etichetta "tipo_documento" $vo.TipoDocumento}} · {{$vo.Codice}}</span>
+      <h2 class="ma-mono">{{with $nome}}{{.}}{{else}}nessun file{{end}}</h2></div>
+      <button type="button" class="ma-btn ma-btn--sm ma-btn--ghost" data-ma-azione="chiudi-dialogo" aria-label="Chiudi">{{template "ma_ic" "x"}}</button></header>
+    <div class="ma-dialogo-corpo">
+      <dl class="ma-dl">
+        <dt>File</dt><dd>{{template "ma_voce_file" (arr $v $vo)}}</dd>
+        <dt>Associazione</dt><dd>{{template "ma_voce_associazione" (arr $v $vo)}}</dd>
+        <dt>Conferma documentale</dt><dd>{{template "ma_st" (arr "esito_fabbisogno" $vo.Esito)}}{{with $vo.Motivo}} <span class="ma-motivo" title="motivo_fabbisogno = {{.}}">{{etichetta "motivo_fabbisogno" .}}</span>{{end}}</dd>
+        <dt>Copia sul NAS</dt><dd>{{template "ma_voce_nas" $vo}}</dd>
+        <dt>Regola</dt><dd>{{template "ma_voce_regole" $vo}}</dd>
+      </dl>
+      {{with $vo.Disegni}}<div class="ma-isp-disegni"><span class="ma-lab">Disegni 2D · principale e altri file candidati</span>{{template "ma_disegni" (arr $v .)}}</div>{{end}}
+      {{with $correnti}}
+      <div class="ma-isp-correnti"><span class="ma-lab">Documenti correnti dello stesso tipo</span>
+        <ul class="ma-elenco">{{range .}}<li><span class="ma-mono">{{.NomeFile}}</span>{{with .Rev}} <span class="ma-motivo">rev {{.}}</span>{{end}}</li>{{end}}</ul>
+        {{if $vo.PropostaAperta}}<p class="ma-nota--ver">Se la conferma chiede di scegliere fra aggiungere e sostituire, in questa pagina si rifiuta (U-08): la scelta si fa nel Fascicolo.</p>{{end}}
+      </div>
+      {{end}}
+    </div>
+    <div class="ma-dialogo-piede ma-dialogo-piede--gesti">
+      {{with $vo.PropostaAperta}}
+        <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/assegna">
+          <fieldset {{if not $s}}disabled{{end}}>
+            <input type="hidden" name="proposta" value="{{.}}">
+            <label class="ma-campo ma-campo--largo"><span>Componente</span><select name="componente" required><option value="" disabled selected>scegli il componente</option>{{template "ma_opzioni_componenti" (arr $v $p "")}}</select></label>
+            <button class="ma-btn ma-btn--sm">{{template "ma_ic" "link"}} Associa a questo componente</button>
+          </fieldset>
+          <small class="ma-muto">Associazione a mano, non confermata: per una proposta la domanda fra aggiungere e sostituire la fa la conferma.</small>
+        </form>
+      {{else}}{{with $vo.DocumentoID}}
+        <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/assegna">
+          <fieldset {{if not $s}}disabled{{end}}>
+            <input type="hidden" name="documento" value="{{.}}">
+            {{template "ma_scelte_documento" (arr $v $p $vo)}}
+            <button class="ma-btn ma-btn--sm">{{template "ma_ic" "link"}} Associa a questo componente</button>
+          </fieldset>
+          <small class="ma-muto">Se il componente ha già un documento corrente dello stesso tipo, si sceglie fra aggiungere e sostituire.</small>
+        </form>
+      {{end}}{{end}}
+      {{if or $vo.PropostaAperta $vo.DocumentoID}}
+        <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/assegna"
+              data-ma-domanda="Togliere {{or $nome "il file"}} da {{$vo.Codice}}? Il file resta nel thread e non viene scartato: perde solo il componente.">
+          <fieldset {{if not $s}}disabled{{end}}>
+            <input type="hidden" name="componente" value="">
+            {{with $vo.PropostaAperta}}<input type="hidden" name="proposta" value="{{.}}">{{else}}{{with $vo.DocumentoID}}<input type="hidden" name="documento" value="{{.}}">{{end}}{{end}}
+            <button class="ma-btn ma-btn--sm">Togli dal componente</button>
+          </fieldset>
+        </form>
+      {{end}}
+      {{with $vo.DerogaID}}
+        <button type="button" class="ma-btn ma-btn--sm" data-ma-gesto="/thread/{{$t}}/fascicolo/deroga/{{.}}/revoca" data-ma-domanda="Revocare la deroga? Il requisito torna a contare." {{if not $s}}disabled{{end}}>Revoca la deroga</button>
+      {{else}}{{if ne $vo.Esito "presente"}}
+        <form class="ma-gesto" data-ma-gesto="/thread/{{$t}}/fascicolo/componente/{{$vo.ComponenteID}}/deroga">
+          <fieldset {{if not $s}}disabled{{end}}>
+            <input type="hidden" name="tipo" value="{{$vo.TipoDocumento}}">
+            <label class="ma-campo"><span>Motivo della deroga</span><input name="motivo" required maxlength="200"></label>
+            <button class="ma-btn ma-btn--sm">Deroga</button>
+          </fieldset>
+          {{if eq $vo.TipoDocumento "disegno_2d"}}<small class="ma-muto">Una deroga non sostituisce il 2D.</small>{{end}}
+        </form>
+      {{end}}{{end}}
+      {{with $vo.PropostaAperta}}
+        <div class="ma-gesti-pericolo">
+          <button type="button" class="ma-btn ma-btn--sm ma-btn--danger" data-ma-gesto="/proposta/{{.}}/scarta" title="Lo scarto del file è definitivo (DB7-8)."
+                  data-ma-domanda="Scartare il file {{or $nome "proposto"}}? Lo scarto è definitivo: nessun gesto lo riporta indietro." {{if not $s}}disabled{{end}}>Scarta il file</button>
+        </div>
+      {{end}}
+      <button type="button" class="ma-btn ma-btn--ghost" data-ma-azione="chiudi-dialogo">Chiudi</button>
+    </div>
+  </div>
+</dialog>
+{{end}}
+
+{{/* «Associa» di un documento (FE-11): il componente, e per ogni componente che ha già documenti correnti dello
+   stesso tipo (Indice.Correnti) un fieldset con «scelta»: aggiungi, o sostituisci:<id> per ogni corrente (si salta il
+   documento stesso). Nessun radio spuntato; motore_a.mjs accende solo il fieldset del componente scelto; senza JS
+   restano spenti e il server rifiuta elencando i correnti (nessuna scrittura sbagliata). `nuovo_riferimento` non
+   si offre (D-PF-09, RAC-24). */}}
+{{define "ma_scelte_documento"}}{{$v := index . 0}}{{$p := index . 1}}{{$vo := index . 2}}
+<label class="ma-campo ma-campo--largo"><span>Componente</span><select name="componente" required data-ma-scelte><option value="" disabled selected>scegli il componente</option>{{template "ma_opzioni_componenti" (arr $v $p "")}}</select></label>
+{{$target := ""}}{{with $p.ComponenteID}}{{$target = .String}}{{with $v.Dati.Indice.Componente .}}{{template "ma_scelta_per" (arr $v $vo .ID)}}{{end}}{{end}}
+{{range $p.Nodi}}{{with .Nodo.Decisione}}{{if ne .ComponenteID.String $target}}{{template "ma_scelta_per" (arr $v $vo .ComponenteID)}}{{end}}{{end}}{{end}}
+{{range $p.ConfermatiSenzaSTEP}}{{with .Nodo.Decisione}}{{if ne .ComponenteID.String $target}}{{template "ma_scelta_per" (arr $v $vo .ComponenteID)}}{{end}}{{end}}{{end}}
+{{end}}
+
+{{define "ma_scelta_per"}}{{$v := index . 0}}{{$vo := index . 1}}{{$c := index . 2}}{{$d := $v.Dati}}
+{{$doc := ""}}{{with $vo.DocumentoID}}{{$doc = .String}}{{end}}
+{{with $d.Indice.Correnti $c $vo.TipoDocumento}}
+<fieldset class="ma-scelte" data-ma-scelta-per="{{$c}}" disabled hidden>
+  <legend>Il componente ha già {{etichetta "tipo_documento" $vo.TipoDocumento}} correnti: che cosa fa questo documento?</legend>
+  <label class="ma-scelta"><input type="radio" name="scelta" value="aggiungi" required><span>si aggiunge ai correnti</span></label>
+  {{range .}}{{if ne .DocumentoID.String $doc}}<label class="ma-scelta"><input type="radio" name="scelta" value="sostituisci:{{.DocumentoID}}" required><span>sostituisce {{.NomeFile}}{{with .Rev}} (rev {{.}}){{end}}</span></label>{{end}}{{end}}
+  <label class="ma-campo"><span>Motivo</span><input name="motivo" maxlength="200" placeholder="serve per una versione interna"></label>
+</fieldset>
+{{end}}
+{{end}}
+
+{{/* La copia sul NAS del prodotto: le voci in coda o in errore (Indice.CopieAperte, C-25) e l'UNICO «Riprova le
+   copie» della pagina. Confermato non vuol dire copiato. */}}
+{{define "ma_nasbox"}}{{$v := index . 0}}{{$p := index . 1}}{{$d := $v.Dati}}{{$aperte := $d.Indice.CopieAperte $p.Rif}}
+<section class="ma-nasbox" id="ma-nas" aria-labelledby="ma-nas-t">
+  <header>{{template "ma_ic" "folder"}}<h3 id="ma-nas-t">Copia sul NAS</h3></header>
+  {{with $aperte}}
+  <ul class="ma-miss">
+  {{range .}}<li>{{template "ma_st" (arr "stato_nas" .StatoNas)}}<span><span class="ma-mono">{{.Codice}}</span> · {{etichetta "tipo_documento" .TipoDocumento}}</span></li>{{end}}
+  </ul>
+  {{else}}<p class="ma-hint">Nessuna copia in coda o in errore per questo prodotto.</p>{{end}}
+  <button type="button" class="ma-btn{{if $aperte}} ma-btn--pri{{end}}" data-ma-gesto="/thread/{{$d.ThreadID}}/riprova-copie" {{if not $d.Scrive}}disabled{{end}} title="Rimette in coda le copie in attesa o in errore.">{{template "ma_ic" "refresh"}} Riprova le copie sul NAS</button>
+  <p class="ma-hint">Confermare un documento mette la copia in coda: «copiato sul NAS» arriva solo quando la copia è scritta.</p>
+</section>
+{{end}}
+
+{{/* Non bloccanti, fuori perimetro, scartati, orfani e avvisi: a parte. Niente contatori calcolati qui per fuori
+   perimetro e scartati (D-PF-19): i numeri restano dove sono campi del server. */}}
+{{define "ma_file_a_parte"}}{{$v := index . 0}}{{$p := index . 1}}{{$d := $v.Dati}}{{$e := $d.Esito}}{{$cd := $p.Documenti}}
+<div class="ma-chiusi">
+<details class="ma-fs ma-fs--chiusa" data-ma-ricorda="nonbloccanti">
+  <summary><h3>Non bloccanti ({{len $cd.NonBloccanti}})</h3></summary>
+  {{if $cd.NonBloccanti}}<ul class="ma-elenco">{{range $cd.NonBloccanti}}<li>
+    <span class="ma-mono" title="componente {{.ComponenteID}}">{{with $d.Indice.Componente .ComponenteID}}{{.Codice}}{{else}}componente {{uuidBreve .ComponenteID}}{{end}}</span> · <span title="tipo_documento = {{.TipoDocumento}}">{{etichetta "tipo_documento" .TipoDocumento}}</span>
+    {{with .EsitoVista}}<span class="ma-motivo" title="esito_vista = {{.}}">{{etichetta "esito_vista" .}}</span>{{end}}{{with .NotaRegola}}<span class="ma-motivo" title="nota_regola = {{.}}">{{etichetta "nota_regola" .}}</span>{{end}}{{if .DerogaID}}<span class="ma-badge">derogato</span>{{end}}
+  </li>{{end}}</ul>{{else}}<p class="ma-vuoto">Nessuno.</p>{{end}}
+</details>
+<details class="ma-fs ma-fs--chiusa" data-ma-ricorda="fuori">
+  <summary><h3>Fuori perimetro</h3></summary>
+  <ul class="ma-elenco">{{range $e.Associazioni}}{{if ne .Perimetro "dentro"}}<li>
+    {{template "ma_mini" (arr ($d.Indice.Anteprima .AllegatoID) ($d.Indice.NomeFile .AllegatoID) "riga")}}
+    <span class="ma-mono">{{with $d.Indice.NomeFile .AllegatoID}}{{.}}{{else}}file {{uuidBreve .AllegatoID}}{{end}}</span>
+    {{template "ma_st" (arr "perimetro" .Perimetro)}}
+    {{with $d.Indice.File .AllegatoID}}{{template "ma_st" (arr "disponibilita" .Disponibilita)}}{{end}}
+  </li>{{end}}{{end}}</ul>
+</details>
+<details class="ma-fs ma-fs--chiusa" data-ma-ricorda="scartati">
+  <summary><h3>Scartati</h3></summary>
+  <ul class="ma-elenco">{{range $e.Associazioni}}{{if .Esclusa}}<li>
+    <span class="ma-mono ma-muto">{{with $d.Indice.NomeFile .AllegatoID}}{{.}}{{else}}file {{uuidBreve .AllegatoID}}{{end}}</span> <span class="ma-st ma-st--neu ma-st--sm">scartato</span>
+  </li>{{end}}{{end}}</ul>
+</details>
+<details class="ma-fs ma-fs--chiusa" data-ma-ricorda="orfani" {{if or $e.Fascicolo.Orfani $e.Fascicolo.Avvisi}}open{{end}}>
+  <summary><h3>Orfani e avvisi ({{$e.Fascicolo.Orfani}} · {{len $e.Fascicolo.Avvisi}})</h3></summary>
+  <ul class="ma-elenco">
+    {{range $e.DaSmistare}}{{if .Orfano}}<li><span class="ma-mono">{{.NomeFile}}</span> <span class="ma-badge ma-badge--ver">orfano</span> {{template "ma_st" (arr "motivo_smistamento" .Motivo)}}</li>{{end}}{{end}}
+    {{range $e.Fascicolo.Avvisi}}<li class="ma-avviso-riga">{{.}}</li>{{end}}
+  </ul>
+  {{if not (or $e.Fascicolo.Orfani $e.Fascicolo.Avvisi)}}<p class="ma-vuoto">Nessun orfano e nessun avviso.</p>{{end}}
+</details>
+</div>
+{{end}}
+
+{{/* ================================================================ R10 riepilogo della RFQ (vista=rfq)
+  Gli assi del prodotto, i prodotti (che sono anche la scelta del prodotto), il fascicolo, i conflitti dello
+  smistamento e del thread, il confronto con il calcolo vecchio, e ciò che non è ancora disponibile. Nessun gesto. */}}
+{{define "ma_riepilogo"}}{{$v := index . 0}}{{$p := index . 1}}{{$d := $v.Dati}}{{$e := $d.Esito}}{{$base := printf "/thread/%s/motore-a" $d.ThreadID}}
+<div class="ma-riepilogo" id="ma-riepilogo">
+  <section class="ma-fs ma-assi-box" aria-labelledby="ma-assi-t">
+    <div class="ma-assi-testa"><h2 id="ma-assi-t">Assi del prodotto <span class="ma-mono">{{or $p.CodiceRichiesto $p.Rif}}</span></h2></div>
+    <div class="ma-assi">
+      <div class="ma-asse ma-asse--{{template "ma_tono" $p.Identita}}"><span class="ma-lab">1 · Prodotto della RFQ</span>
+        <b>{{template "ma_st" (arr "stato_identita_target" $p.Identita)}}</b>
+        {{with $p.Autorita}}<span class="ma-k3" title="autorita = {{.}}">autorità: {{etichetta "autorita" .}}</span>{{end}}
+        {{if not $p.ComponenteID}}<span class="ma-k3">senza componente</span>{{end}}</div>
+      <div class="ma-asse ma-asse--{{if $p.Fonte.Calcolata}}{{template "ma_tono_d" (arr "stato_fonte" $p.Fonte.Stato)}}{{else}}neu{{end}}"><span class="ma-lab">2 · Fonte strutturale</span>
+        <b>{{if $p.Fonte.Calcolata}}{{template "ma_st" (arr "stato_fonte" $p.Fonte.Stato)}}{{else}}<span class="ma-st ma-st--na" title="fonte.calcolata = false">non calcolata</span>{{end}}</b>
+        {{with $p.Fonte.Motivo}}<span class="ma-k3" title="motivo_fonte = {{.}}">{{etichetta "motivo_fonte" .}}</span>{{end}}</div>
+      <div class="ma-asse ma-asse--{{template "ma_tono" $p.BOM.Nomenclatura.Stato}}"><span class="ma-lab">3 · Nomenclatura</span>{{template "ma_asse_bom" $p.BOM.Nomenclatura}}</div>
+      <div class="ma-asse ma-asse--{{template "ma_tono" $p.BOM.Gerarchia.Stato}}"><span class="ma-lab">4 · Gerarchia</span>{{template "ma_asse_bom" $p.BOM.Gerarchia}}
+        {{if $p.BOM.RimozioniAperte}}<span class="ma-k3">{{$p.BOM.RimozioniAperte}} rimozioni aperte</span>{{end}}</div>
+      <div class="ma-asse ma-asse--{{if $p.Smistamento.Calcolata}}{{template "ma_tono" $p.Smistamento.Stato}}{{else}}neu{{end}}"><span class="ma-lab">5 · Smistamento</span>
+        <b>{{if $p.Smistamento.Calcolata}}{{template "ma_st" (arr "stato_smistamento" $p.Smistamento.Stato)}}{{else}}<span class="ma-st ma-st--na">non calcolato</span>{{end}}</b>
+        {{range $p.Smistamento.Motivi}}<span class="ma-k3" title="motivo_smistamento = {{.}}">{{etichetta "motivo_smistamento" .}}</span>{{end}}
+        {{with $p.Smistamento.FileNonTerminali}}<span class="ma-k3">{{len .}} file non ancora terminali</span>{{end}}</div>
+      <div class="ma-asse ma-asse--{{template "ma_tono" $p.Documenti.Stato}}"><span class="ma-lab">6 · Documenti</span>
+        <b>{{template "ma_st" (arr "stato_documenti" $p.Documenti.Stato)}}</b>
+        {{with $p.Documenti.Motivo}}<span class="ma-k3" title="motivo = {{.}}">{{etichetta "motivo_documenti" .}}</span>{{end}}
+        {{if $p.Documenti.PerimetroChiuso}}<span class="ma-k3">perimetro chiuso</span>{{else}}<span class="ma-k3" title="motivo_perimetro = {{$p.Documenti.MotivoPerimetro}}">perimetro aperto{{with $p.Documenti.MotivoPerimetro}}: {{etichetta "motivo_perimetro" .}}{{end}}</span>{{end}}</div>
+      <div class="ma-asse ma-asse--tot ma-asse--{{template "ma_tono" $p.Stato}}"><span class="ma-lab">Stato del prodotto</span>
+        <b>{{template "ma_st" (arr "stato_prodotto" $p.Stato)}} {{if $p.Verificato}}<span class="ma-st ma-st--ok" title="prodotto_verificato = true">verificato</span>{{else}}<span class="ma-st ma-st--ver" title="prodotto_verificato = false">non verificato</span>{{end}}</b>
+        {{range $p.Motivi}}<span class="ma-k3" title="motivo_prodotto = {{.}}">{{etichetta "motivo_prodotto" .}}</span>{{end}}</div>
+    </div>
+    <p class="ma-nota">«Pronto» non vuol dire «partito»: la fase la cambia solo un gesto registrato.</p>
+  </section>
+
+  <section class="ma-fs" aria-labelledby="ma-prodotti-t">
+    <header><h2 id="ma-prodotti-t">Prodotti della RFQ</h2><span class="ma-k3 ma-piccolo">scegli un prodotto per vederne gli assi</span></header>
+    <div class="ma-scorre ma-wrap-tb"><table class="ma-tabella">
+      <thead><tr><th scope="col">Prodotto</th><th scope="col">Identità</th><th scope="col">Fonte</th><th scope="col">Struttura</th><th scope="col">Smistamento</th><th scope="col">Documenti</th><th scope="col">Stato</th></tr></thead>
+      <tbody>{{range $e.ProdottiValutati}}{{$u := printf "%s?prodotto=%s&vista=rfq" $base (urlquery .Rif)}}<tr{{if eq .Rif $d.Prodotto}} class="ma-riga-scelta"{{end}}>
+        <th scope="row"><a href="{{$u}}" hx-get="{{$u}}" hx-target="#ma" hx-swap="innerHTML" hx-push-url="true" class="ma-mono" title="{{.Rif}}" {{if eq .Rif $d.Prodotto}}aria-current="true"{{end}}>{{or .CodiceRichiesto .Rif}}</a></th>
+        <td>{{template "ma_st" (arr "stato_identita_target" .Identita)}}</td>
+        <td>{{if .Fonte.Calcolata}}{{template "ma_st" (arr "stato_fonte" .Fonte.Stato)}}{{else}}<span class="ma-st ma-st--na">non calcolata</span>{{end}}</td>
+        <td>{{template "ma_st" (arr "stato_struttura" .Struttura)}}{{if .BOM.Verificata}} <span class="ma-motivo">BOM verificata</span>{{end}}</td>
+        <td>{{template "ma_st" (arr "stato_smistamento" .Smistamento.Stato)}}</td>
+        <td>{{template "ma_st" (arr "stato_documenti" .Documenti.Stato)}}</td>
+        <td>{{template "ma_st" (arr "stato_prodotto" .Stato)}}{{range .Motivi}} <span class="ma-motivo" title="motivo_prodotto = {{.}}">{{etichetta "motivo_prodotto" .}}</span>{{end}}</td>
+      </tr>{{end}}</tbody>
+    </table></div>
+  </section>
+
+  {{template "ma_fascicolo" (arr $v $p)}}
+
+  {{template "ma_conflitti" (arr $v $p "smistamento")}}
+  {{with $d.Indice.Conflitti $p.Rif "struttura"}}{{$uD := printf "%s?prodotto=%s&vista=distinta" $base (urlquery $p.Rif)}}<p class="ma-nota"><a href="{{$uD}}" hx-get="{{$uD}}" hx-target="#ma" hx-swap="innerHTML" hx-push-url="true">{{len .}} conflitti della struttura: sono nella Distinta ▸</a></p>{{end}}
+  {{with $d.Indice.ConflittiDelThread}}
+  <section class="ma-fs" aria-labelledby="ma-conf-thread-t">
+    <header><h2 id="ma-conf-thread-t">Conflitti del thread ({{len .}})</h2></header>
+    <ul class="ma-elenco">{{range .}}<li>{{template "ma_st" (arr "tipo_conflitto" .Tipo)}} <span title="asse = {{.Asse}}">{{etichetta "asse_conflitto" .Asse}}</span>
+      <span class="ma-mono">{{.Decisione}}</span> · <span class="ma-mono">{{.Proposta}}</span>{{with .Motivo}} <span class="ma-motivo" title="motivo = {{.}}">{{etichetta "motivo_conflitto" .}}</span>{{end}}</li>{{end}}</ul>
+  </section>
+  {{end}}
+
+  {{with $d.Confronto}}{{if .Conteggi}}
+  <section class="ma-fs" aria-labelledby="ma-conf-t">
+    <header><h2 id="ma-conf-t">Confronto con il calcolo vecchio</h2></header>
+    <p class="ma-riga-stato">{{range $b, $n := .Conteggi}}<span class="ma-badge ma-badge--{{template "ma_tono" $b}}" title="badge = {{$b}}">{{etichetta "badge" $b}}: {{$n}}</span> {{end}}</p>
+  </section>
+  {{end}}{{end}}
+
+  <details class="ma-fs ma-fs--chiusa" data-ma-ricorda="spenti">
+    <summary><h2>Non ancora disponibile</h2></summary>
+    <ul class="ma-spenti">
+      <li>{{template "ma_na" (arr "Ciclo di produzione" "Non ancora disponibile: ciclo, materiali e preparazioni arrivano dopo A2.")}}</li>
+      <li>{{template "ma_na" (arr "Dati per i costi" "Non ancora disponibile: arrivano dopo A2.")}}</li>
+      <li>{{template "ma_na" (arr "Fattibilità" "Non ancora disponibile: arriva con la fase di fattibilità.")}}</li>
+      <li>{{template "ma_na" (arr "Nuova Inbox e prodotti del messaggio" "Non ancora disponibile: arrivano con AM (R-15).")}}</li>
+      <li>{{template "ma_na" (arr "Passaggi di fase automatici" "Non ancora disponibile: nessun codice li esegue; la fase cambia solo con un gesto registrato.")}}</li>
+      <li>{{template "ma_na" (arr "Numero interno, mittente sospeso, «consegnata», richiesta senza RFQ" "Non ancora disponibile: decisioni ancora aperte (R-02, R-03, R-04, R-05).")}}</li>
+      <li>{{template "ma_na" (arr "Note sui PDF, Conferma Fascicolo legacy" "Non ancora disponibile qui: restano nella pagina del Fascicolo.")}}</li>
+    </ul>
+  </details>
+</div>
+{{end}}
+
+{{define "ma_asse_bom"}}<b>{{template "ma_st" (arr "stato_verifica_asse" .Stato)}}</b>
+{{with .Motivo}}<span class="ma-k3" title="motivo = {{.}}">{{etichetta "motivo_asse" .}}</span>{{end}}
+{{if .DaDecidere}}<span class="ma-k3">{{.DaDecidere}} da decidere</span>{{end}}
+{{if .Conflitti}}<span class="ma-k3 ma-k3--ko">{{len .Conflitti}} conflitti</span>{{end}}
+{{if .Legacy}}<span class="ma-k3" title="legacy = true (calcolo del giro 4)">dal calcolo precedente</span>{{end}}
+{{end}}
+
+{{/* Il fascicolo: motivi e liste letti, mai ricalcolati. I contatori sono nel cartiglio. $p può essere nil.
+   «Congela la V1» resta spento, con il motivo (contratto §6). */}}
+{{define "ma_fascicolo"}}{{$v := index . 0}}{{$d := $v.Dati}}{{with $d.Esito}}{{$f := .Fascicolo}}
+<section class="ma-fs" aria-labelledby="ma-fasc-t">
+  <header><h2 id="ma-fasc-t">Fascicolo della RFQ</h2>
+    {{if .Valutato}}<span class="ma-st ma-st--ok">thread valutato</span>{{else}}<span class="ma-st ma-st--ver" title="motivo_thread = {{.Motivo}}">thread non valutato{{with .Motivo}}: {{etichetta "motivo_thread" .}}{{end}}</span>{{end}}
+    <span class="ma-sp"></span>
+    {{template "ma_na" (arr "Congela la V1" "Non ancora disponibile: il congelamento non si registra da questa pagina.")}}</header>
+  <dl class="ma-dl">
+    <dt>Pronti</dt><dd>{{range $f.Pronti}}<span class="ma-badge" title="{{.}}">{{with $d.Indice.Prodotto .}}{{or .CodiceRichiesto .Rif}}{{else}}{{.}}{{end}}</span> {{else}}<span class="ma-muto">nessuno</span>{{end}}</dd>
+    <dt>Bloccati</dt><dd>{{range $f.Bloccati}}<div><span class="ma-mono" title="{{.Rif}}">{{with $d.Indice.Prodotto .Rif}}{{or .CodiceRichiesto .Rif}}{{else}}{{.Rif}}{{end}}</span>
+      {{range .Motivi}}<span class="ma-motivo" title="motivo_prodotto = {{.}}">{{etichetta "motivo_prodotto" .}}</span>{{end}}</div>{{else}}<span class="ma-muto">nessuno</span>{{end}}</dd>
+    {{with $f.ConflittiCongelamento}}<dt>Conflitti</dt><dd>{{range .}}<span class="ma-motivo ma-motivo--ko">{{.}}</span> {{end}}</dd>{{end}}
+    {{with $f.Legacy}}<dt title="congelamento del giro 4">Versione precedente</dt><dd>versione {{.VersioneCorrente}} · <span title="{{.StatoCorrente}}">{{etichetta "stato_versione" .StatoCorrente}}</span>{{with .UltimaCongelata}} · ultima congelata V{{.}}{{end}}{{if .Riaperta}} · riaperta{{end}} <span class="ma-muto" title="congelamento del giro 4">(congelamento precedente, a parte)</span></dd>{{end}}
+    <dt>Orfani</dt><dd>{{$f.Orfani}} <span class="ma-muto">(l'elenco è nel riepilogo documentale)</span></dd>
+  </dl>
+</section>
+{{end}}{{end}}

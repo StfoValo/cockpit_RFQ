@@ -84,6 +84,21 @@ markmap:
       `dst_documenti`, `dst_riga_file`, `dst_fattibilita`;
     - fuori dal corpo il visore dei disegni (`#dst-visore`) e l'avviso breve (`#dst-toast`), che un gesto non chiude
   - Chi lo rende: `distinta.go`
+- **`motore_a.html`**
+  - Che cosa contiene: la Distinta nuova del motore A (giro 5, A1d; solo l'admin, dietro `[motore_a].anteprima`), un
+    solo workspace per `vista=distinta` e `vista=documenti`, il riepilogo per `vista=rfq`:
+    - `contenuto`: `#ma-avviso` (fuori da `#ma`: la rilettura non lo cancella), `#ma` con gli indirizzi di pdf.js
+      (`data-ma-pdfjs`, `data-ma-pdfjs-worker`), il foglio `motore_a.css`, l'importmap del ponte e il modulo
+      `motore_a.mjs` (vedi «Statici, impronte e cache»);
+    - `motore_a_corpo`: il frammento che htmx rimette in `#ma`, un solo elemento di primo livello, la `.ma` con
+      `data-ma-thread`, `data-ma-prodotto`, `data-ma-vista`;
+    - 61 `define` con il prefisso `ma_` (testa e cartiglio, viste e prodotti, conferma della fonte, conferma
+      dell'albero sopra le schede, albero a schede, anteprima persistente, conflitti, «Da smistare», riepilogo
+      documentale, riepilogo della RFQ);
+    - legge solo `.Dati` (`paginaMotoreA`: l'esito, il confronto, le ricerche di `Indice`); ogni valore di enum passa da
+      `{{etichetta "<dominio>" …}}`; i gesti sono `data-ma-gesto` (li manda il ponte), le letture `hx-get`; con
+      `Scrive` falso ogni gesto e' spento
+  - Chi lo rende: `motore_a.go:rendiMotoreA`
 - **`richieste.html`**
   - Che cosa contiene: la pagina Richieste:
     - `richieste_elenco`, `richiesta_card`, `richiesta_prodotti`;
@@ -188,7 +203,17 @@ markmap:
     - il visore con le note (`/fascicolo/nota`, `/nota/{id}/modifica`, `/nota/{id}/elimina`)
 - **`motore_a_gesti.mjs`** — che cosa e':
   - il ponte dei gesti della Distinta nuova (giro 5, A1d; del backend, API fissa: `esegui`, `leggi`, `confermaAlbero`,
-    `aggiorna`); l'unico punto che chiama le rotte di scrittura dalla pagina `motore-a`
+    `aggiorna`); l'unico punto che chiama le rotte di scrittura dalla pagina `motore-a`; lo carica `motore_a.mjs`
+    attraverso l'importmap di `motore_a.html`, mai un altro `<script>`
+- **`motore_a.css`** — che cosa e':
+  - lo stile della Distinta nuova, tutto sotto `.ma`, `#ma-avviso` e `.ma-finestra` (le finestre stanno in `body`):
+    token della pagina, il workspace con le container query (tre colonne da 1180 px, due da 860 px, sotto una e
+    l'anteprima come foglio dal basso), schede, albero, miniature; nessun `url(`, nessun font da internet
+- **`motore_a.mjs`** — che cosa e':
+  - il modulo ES della Distinta nuova, solo presentazione: schede e rami dell'albero, la casella scelta e
+    l'anteprima persistente (`sessionStorage`), le miniature con pdf.js (una GET di `/allegato/{id}/anteprima?v=…`
+    per disegno, al piu' due insieme), le finestre dello STEP strutturale, del tipo e di «Conferma l'albero» (con le
+    letture del ponte), la tastiera, il fuoco dopo la rilettura di `#ma`. Non scrive: ogni gesto passa dal ponte
 - **`pdfjs-6.3.289/`** — che cosa e':
   - pdf.js dal pacchetto npm `pdfjs-dist` 6.3.289 (Apache-2.0), senza modifiche:
     - `pdf.min.mjs`, `pdf.worker.min.mjs`,
@@ -224,7 +249,7 @@ markmap:
 
 1. `Init` costruisce un set base `layout` = `layout.html` + `frammenti.html`, con le funzioni di
    `server.go:funzioni` piu' `statico`;
-   - poi, per ognuna delle tredici pagine elencate in `Init`, un `Clone` del base con il file della pagina.
+   - poi, per ognuna delle sedici pagine elencate in `Init`, un `Clone` del base con il file della pagina.
    - Ogni pagina ha il suo `contenuto`: un nome di `define` deve essere unico solo fra `layout.html`,
      `frammenti.html` e il file della pagina.
 2. `rendi(w, r, pagina, frammento, …)`:
@@ -249,8 +274,14 @@ markmap:
   - Il resto lo fa `http.FileServerFS`.
 - **Passano da `statico` tutti gli statici che i template caricano:**
   - `style.css` e `htmx.min.js` in `layout.html`,
-  - `fascicolo.mjs` in `fascicolo.html`.
-  - Nessun template scrive `/static/` a mano.
+  - `fascicolo.mjs` in `fascicolo.html`;
+  - `motore_a.css`, `motore_a.mjs` e gli indirizzi di pdf.js in `motore_a.html`.
+  - Nessun template scrive `/static/` a mano, con una sola eccezione dichiarata (P-10, RAC-18): la chiave
+    dell'importmap di `motore_a.html`, `<script type="importmap">{"imports":{"/static/motore_a_gesti.mjs":
+    "{{statico "motore_a_gesti.mjs"}}"}}</script>`, prima del modulo. `motore_a.mjs` importa
+    `"./motore_a_gesti.mjs"`, che il browser risolve in `/static/motore_a_gesti.mjs`; la mappa lo porta
+    all'indirizzo con l'impronta, cosi' anche il ponte cambia indirizzo a ogni binario nuovo
+    (`motore_a_test.go:TestMotoreAIlContenutoHaLImportmap`).
   - Un binario nuovo porta impronte nuove, e il browser non tiene i file di ieri pur con la cache `immutable`.
 
 ### Il corpo di una mail
@@ -449,6 +480,17 @@ markmap:
     - anteprima PDF (`anteprima_pdf.py`),
     - Fascicolo (`fascicolo.py`),
     - Fascicolo v3 con pdf.js, note ed editor (`fascicolo_v3.py`)
+- **`internal/transport/web/motore_a_render_test.go`, `motore_a_statici_test.go`, `motore_a_casi_test.go`**
+  - Livello: L1
+  - Che cosa prova: la Distinta nuova resa dal template vero per ogni caso ACME di `testdata/motore_a/`, vista,
+    prodotto e `Scrive` (pagina e frammento), i testi ostili che restano testo, i controlli statici dei tre file
+    (nessun HTML inserito dal JS, una sola `fetch`, nessun `htmx.ajax`, `sendBeacon` o XHR, il CSS solo dentro la
+    pagina, nessun indirizzo esterno); con `MA_HTML=<cartella>` scrive le pagine per
+    il kit jsdom (`testdata/motore_a/kit/prove/prove.cjs`, Node e jsdom fuori dal repository)
+- **`internal/transport/web/motore_a_browser_test.go` + `e2e/motore_a.py`** (tag `integrazione browser`)
+  - Livello: L4 (testata), Playwright su Edge
+  - Che cosa prova: la Distinta nuova in un browser vero (apertura, schede, miniature, anteprima persistente, un
+    gesto rifiutato e uno riuscito, il flag spento)
 - `fascicolo.mjs` non ha test unitari JavaScript: lo prova solo L7.
 
 ## Stato dell'implementazione
