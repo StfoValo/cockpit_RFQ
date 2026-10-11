@@ -246,6 +246,8 @@ var funzioni = template.FuncMap{
 	// motivi della proposta senza le righe dell'evento, che si mostrano a parte
 	"eventoRiga":     eventoDellaRiga,
 	"motiviProposta": motiviProposta,
+	// giro 5, A1d (contratto §2.3): il testo di un valore di enum, per tutte le pagine
+	"etichetta": etichetta,
 }
 
 // intero legge un numero intero di qualunque larghezza, per le poche somme dei template.
@@ -331,6 +333,8 @@ func (s *Server) Registra(mux *http.ServeMux) {
 	s.registraInbox(mux)
 	s.registraRFQ(mux)
 	s.registraDistinta(mux)
+	// giro 5, A1d: la Distinta nuova, dietro [motore_a] (motore_a.go)
+	s.registraMotoreA(mux)
 	s.registraPostazioni(mux)
 	s.registraAdmin(mux)
 }

@@ -186,6 +186,9 @@ markmap:
       «niente sotto un particolare» anche nel trascinamento),
     - le miniature dei disegni (pdf.js, la prima pagina, una volta per file),
     - il visore con le note (`/fascicolo/nota`, `/nota/{id}/modifica`, `/nota/{id}/elimina`)
+- **`motore_a_gesti.mjs`** — che cosa e':
+  - il ponte dei gesti della Distinta nuova (giro 5, A1d; del backend, API fissa: `esegui`, `leggi`, `confermaAlbero`,
+    `aggiorna`); l'unico punto che chiama le rotte di scrittura dalla pagina `motore-a`
 - **`pdfjs-6.3.289/`** — che cosa e':
   - pdf.js dal pacchetto npm `pdfjs-dist` 6.3.289 (Apache-2.0), senza modifiche:
     - `pdf.min.mjs`, `pdf.worker.min.mjs`,

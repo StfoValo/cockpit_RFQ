@@ -25,6 +25,10 @@ markmap:
   - `GET /thread/{id}/distinta/dati` (i PDF, le note e la completezza della Distinta) e `GET /thread/{id}/distinta/tipo`
     (l'anteprima di un cambio di tipo, con la firma): JSON con `Cache-Control: no-store` (`distinta.go`), chiesti da
     `distinta.mjs` con `fetch`;
+  - `GET /thread/{id}/motore-a/dati`: JSON dei dati della Distinta nuova (contratto A1d §2.4) con `Cache-Control:
+    no-store` (`motore_a.go:motoreADati`), chiesto con `fetch` e mai da htmx;
+  - `GET /thread/{id}/motore-a/anteprima/step-strutturale`: JSON dell'anteprima dell'autorizzazione dello STEP, con
+    `Cache-Control: no-store`, letto in una transazione READ ONLY (`motore_a_anteprima.go:motoreAAnteprimaStep`);
   - `GET /allegato/{id}/anteprima`: i byte del PDF (`anteprima.go:anteprima`), che si aprono solo come documento (iframe,
     pdf.js, scheda nuova);
   - `POST /admin/postazioni/{host}/pacchetto`: lo zip del pacchetto, in download (`postazioni_admin.go:pacchettoWorker`);
@@ -114,6 +118,10 @@ markmap:
       `HX-Current-URL` e' la Distinta `threadFrammento` risponde con il suo corpo (`dallaDistinta`, `rispondiDistinta`).
     - La struttura si salva con `POST /fascicolo/bom/applica`, come l'editor; il visore e le note sono quelli della vista
       Documenti (`/allegato/{id}/anteprima`, `/fascicolo/nota`).
+- **Distinta nuova (motore A, giro 5, A1d)**
+  - File: `motore_a.go`, `motore_a_indice.go`, `motore_a_etichette.go`, `motore_a_anteprima.go`, `motore_a_passaggio.go`
+  - Schermata: `/thread/{id}/motore-a`, dietro `[motore_a]`, solo admin (la pagina arriva in A1d-P3; in A1d-P2 ci sono
+    i dati, l'anteprima dello STEP e il ramo dell'esito dei gesti)
 - **Fascicolo: schermata e viste**
   - File: `fascicolo_pagina.go`, `fascicolo_rotte.go`, `fascicolo_bom.go`, `fascicolo_dettaglio.go`
   - Schermata: `/thread/{id}/fascicolo`
@@ -1063,7 +1071,8 @@ markmap:
   - `cruscotto` reindirizza con 303 a `/richieste`
 - **`thread.go`**
   - `threadDati`, `messaggioThread` (con `Corpo`), `thread` (`sel` solo se UUID)
-  - `threadFrammento` (se il gesto viene dal Fascicolo risponde con `rispondiFascicolo`)
+  - `threadFrammento` (a flag `[motore_a]` acceso, se il gesto viene dalla Distinta nuova risponde con `rispondiMotoreA`,
+    `motore_a.go`; se viene dalla Distinta con `rispondiDistinta`; se viene dal Fascicolo con `rispondiFascicolo`)
   - `riprovaCopie`, `rimettiInCoda`, `esitoCopie`, `caricaThread`
 - **`proposte.go`**
   - `registraProposte`, `gesto`/`gestoPoi` (tutto o niente, «Niente è cambiato: …»), `idDa`
@@ -1927,6 +1936,133 @@ markmap:
   - Apri: `anteprima.go:sorgenteAnteprima`
 - **che cosa si può caricare a mano**
   - Apri: `caricamento.go`
+
+## Modulo Distinta nuova (motore A)
+
+- `motore_a.go`, `motore_a_indice.go`, `motore_a_etichette.go`, `motore_a_anteprima.go`, `motore_a_passaggio.go`; il
+  ponte dei gesti `web/static/motore_a_gesti.mjs`
+- La Distinta nuova del motore A (giro 5, A1d; contratto A1d v1 e v1.1): `/thread/{id}/motore-a`, dietro
+  `[motore_a].anteprima`, solo per l'admin. In A1d-P2 ci sono i dati (`/dati`), l'anteprima dello STEP e il ramo
+  dell'esito dei gesti; la pagina HTML (`motoreAPagina`, `rendiMotoreA`, `motore_a.html`) arriva in A1d-P3.
+
+### Scopo
+
+- Mostrare che cosa vede il motore A su una RFQ, calcolato a ogni GET in memoria e in sola lettura: aprirla non scrive
+  niente.
+- Offrire come pulsanti solo i gesti che il Cockpit ha già (le rotte del Fascicolo e della Distinta), chiamati dal
+  ponte; la risposta di un gesto partito da qui è solo l'esito, mai la vecchia interfaccia.
+
+### Non appartiene qui
+
+- Le regole del dominio: `core/valutazione`, `core/ancoraggio`, `core/confronto`, `core/rfq/fascicolo`.
+- Le scritture: sono i gesti di sempre (`fascicolo*.go`, `proposte.go`, `allegati.go`, `thread.go`, `smistamento.go`,
+  `codici.go`), che la pagina chiama con il ponte.
+- La lettura delle regole all'avvio: `app/runtime/motore_a.go` (`preparaMotoreA`); la sezione `[motore_a]`:
+  `platform/config`.
+
+### File
+
+- **`motore_a.go`**
+  - `AnteprimaMotoreA` (preparata all'avvio), `ErroreRegoleMotoreA`
+  - `paginaMotoreA`, `testaMotoreA`, `faseRegistrata` (contratto §2.2, con i tag JSON di §2.4)
+  - `registraMotoreA`, `conMotoreA` (la porta del flag), `metodoNonAmmessoMotoreA` (gli altri metodi, dietro la porta)
+  - `paginaMotoreADa` (con un `recover` per i panic fuori dal calcolo), `logNonRiuscitoMotoreA`, `componiPaginaMotoreA`,
+    `testaDa`, `vistaMotoreA`, `prodottoScelto`
+  - `calcolaConLimite` (goroutine, limite dell'indice, `recover`), `calcolaMotoreA` (caricatore → valutazione → copia
+    di passaggio → confronto)
+  - `faseMotoreA`/`faseMotoreADa` (la RFQ e la fase in una transazione READ ONLY)
+  - `motoreADati`, `scriviDatiMotoreA`
+  - `dallaMotoreA`, `rifiutiMotoreA` (l'elenco chiuso, 9 voci), `esitoMotoreA`, `rispondiMotoreA`
+- **`motore_a_indice.go`**: `indiceMotoreA`, le 11 ricerche del contratto §2.3 e le 14 in più per il template
+- **`motore_a_etichette.go`**: `etichetta` (funzione dei template) e la tabella dei testi dei valori enumerati
+- **`motore_a_anteprima.go`**: `motoreAAnteprimaStep`, `anteprimaStepDa`, `effettoInSolaLettura`
+- **`motore_a_passaggio.go`**: la copia di `app/bancoa/passaggio.go` (`maIn*`, `maCopia*`), perché `transport` non
+  importa `app`
+- **`web/static/motore_a_gesti.mjs`**: il ponte, l'unico punto della pagina che chiama le rotte che scrivono (API
+  `esegui`, `leggi`, `confermaAlbero`, `aggiorna`; liste chiuse fra i marcatori `ROTTE` e `LETTURE`)
+
+### Entry point
+
+- `registraMotoreA` (da `Registra`):
+  - `GET /thread/{id}/motore-a/dati`, `GET /thread/{id}/motore-a/anteprima/step-strutturale`, tutte e due montate come
+    `conMotoreA(soloAdmin(…))`;
+  - per ognuna una riga gemella senza metodo, `conMotoreA(metodoNonAmmessoMotoreA)`: a flag spento 404 anche per POST,
+    PUT, DELETE…; a flag acceso il 405 con `Allow: GET, HEAD` che il mux darebbe da sé.
+- `threadFrammento` → `rispondiMotoreA`: il primo controllo, solo a flag acceso, quando `HX-Current-URL` è la pagina
+  `motore-a` della stessa RFQ (`dallaMotoreA`).
+
+### Dati
+
+- **Letture:**
+  - le query di `core/fotorfq/caricatore` (una transazione REPEATABLE READ READ ONLY, del solo thread, senza messaggi
+    fuori RFQ);
+  - `GetThread`, `GetFaseCorrente` (la vista `v_thread_fase`), `ListFaseCatalogo`, in una transazione READ ONLY sua;
+  - le query di `fascicolo.EffettoAutorizzazione` per l'anteprima dello STEP, in una transazione READ ONLY e
+    REPEATABLE READ.
+- **Scritture:** nessuna del dominio. Nessuna migrazione, nessuna query nuova. La riga della sessione la tocca
+  `autenticato` (`ToccaSessione` e, senza postazione, `SetSessionePostazione`), come su ogni rotta autenticata: non è
+  una scrittura di `motore-a`.
+
+### Flussi principali
+
+1. **La GET.** `conMotoreA` (spenta: 404) → `soloAdmin` (sessione, poi ruolo) → `faseMotoreA` (una RFQ che non c'è:
+   404) → regole caricate? → `calcolaConLimite` → `componiPaginaMotoreA` (versione dell'esito, testa, indice, prodotto)
+   → JSON (o, in A1d-P3, la pagina). Un problema diverso dalla RFQ che non c'è è la pagina con `Errore` e una riga di
+   log, mai una pagina a metà.
+2. **Il gesto.** Il ponte → la rotta di sempre (con `HX-Request` e `HX-Current-URL` della pagina) → `threadFrammento`
+   → `<div data-ma-esito="ok|no">testo</div>` → dopo «ok» il ponte rilegge `#ma`.
+
+### Invarianti
+
+- Flag spento: ogni rotta di `motore-a` risponde 404 a tutti **prima** della sessione, con ogni metodo (nessun 405 né
+  `Allow`); il ramo di `threadFrammento` non scatta.
+- HEAD di `/dati` non legge niente e non calcola: dice 200 anche per una RFQ che non c'è (la GET dà 404).
+- Una GET di `motore-a` non scrive: nessun job, nessun prepara, nessuna sincronizzazione.
+- La pagina legge solo l'esito `valutazione-3`: un'altra versione è `Errore`.
+- Il calcolo ha il limite dell'indice (`tempo_massimo_ms`) e un `recover`: un panic non ferma il server. Un panic fuori
+  dal calcolo (la fase, la pagina composta) è l'errore generico, con la pila nel log; una richiesta chiusa da chi l'ha
+  fatta va nel log come Info, non come Error.
+- Le risposte JSON hanno `Cache-Control: no-store` e `X-Content-Type-Options: nosniff`.
+- «no» = `avvisoNegativo` oppure l'elenco chiuso `rifiutiMotoreA` (T-A1d-11), solo in questo ramo: `avvisoNegativo` e
+  la Distinta legacy non cambiano.
+- Mai la tabella dell'agente nei file `motore_a*` (MOTORE-SENZA-LLM).
+
+### Dipendenze
+
+- `core/fotorfq/caricatore`, `core/valutazione`, `core/confronto`, `core/ancoraggio`,
+  `core/inbox/classificazione/motorea`, `core/rfq/fascicolo` (`EffettoAutorizzazione`), `platform/db`. Mai `app/*`,
+  mai `ai/*`.
+
+### Test
+
+- **L1:** `motore_a_test.go` (porta, anche con gli altri metodi, ruolo, rotte, calcolo con limite, versione, pagina,
+  i rami di `paginaMotoreADa` con la lettura della fase finta, `/dati`, HEAD, fase in sola lettura, nessuna scrittura e
+  nessuna tabella dell'agente nei sorgenti, la risposta dei gesti, l'elenco chiuso, la guardia delle frasi, il ramo di
+  `threadFrammento`), `motore_a_indice_test.go`, `motore_a_etichette_test.go`,
+  `motore_a_passaggio_test.go`, `motore_a_anteprima_test.go`, `motore_a_ponte_test.go`; le righe del ponte in
+  `statici_test.go`.
+- **Il ponte con jsdom:** `testdata/motore_a/kit/prove/ponte.cjs` (a mano, con Node; il suo README).
+- **L4 e la prova nel browser:** arrivano con la pagina (A1d-Q3).
+
+### Stato dell'implementazione
+
+- A1d-P2: dati, anteprima dello STEP, ramo dell'esito, ponte. La pagina (A1d-P3) non c'è ancora: `GET
+  /thread/{id}/motore-a` non è una rotta.
+
+### Dove intervenire
+
+- **una frase nuova di un gesto con HTTP 200**
+  - Apro: la tabella `maFrasi` di `motore_a_test.go` (la guardia lo chiede); se è un rifiuto che `avvisoNegativo`
+    legge «ok», `rifiutiMotoreA`
+- **una rotta nuova chiamata dalla pagina**
+  - Apro: le liste del ponte (`web/static/motore_a_gesti.mjs`) e la loro prova (`motore_a_ponte_test.go`)
+- **un valore enumerato nuovo**
+  - Apro: `motore_a_etichette.go` (la prova delle costanti lo chiede)
+
+### Leggi anche
+
+- `internal/core/valutazione/README.md`, `internal/core/confronto/README.md`, `internal/core/fotorfq/caricatore/README.md`
+- `internal/app/README.md` (l'avvio del motore A)
 
 ## Le prove nel browser (`e2e/`)
 
